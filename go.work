@@ -1,0 +1,9 @@
+go 1.21.1
+
+use (
+	./mylife-home-common
+	./mylife-home-core
+	./mylife-home-core-generator
+	./mylife-home-core-library
+	./mylife-home-core-plugins-logic-base
+)

@@ -1,0 +1,2 @@
+bus:
+  serverUrl: tcp://rpi-dev-home-main:1883
