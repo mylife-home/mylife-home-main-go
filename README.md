@@ -13,5 +13,5 @@ go generate mylife-home-core-plugins-driver-absoluta/main.go
 ## run
 
 ```shell
-go run mylife-home-core/main.go server
+go run mylife-home-core/main.go --log-console
 ```
