@@ -4,6 +4,7 @@ import (
 	"mylife-home-core/cmd"
 
 	// Plugin list here
+	_ "mylife-home-core-plugins-driver-absoluta"
 	_ "mylife-home-core-plugins-logic-base"
 )
 
