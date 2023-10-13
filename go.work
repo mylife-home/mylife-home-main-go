@@ -6,4 +6,5 @@ use (
 	./mylife-home-core-generator
 	./mylife-home-core-library
 	./mylife-home-core-plugins-logic-base
+	./mylife-home-core-plugins-driver-absoluta
 )
