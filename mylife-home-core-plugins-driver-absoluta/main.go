@@ -3,5 +3,5 @@
 package plugin_entry
 
 import (
-	_ "mylife-home-core-plugins-driver-aboluta/plugin"
+	_ "mylife-home-core-plugins-driver-absoluta/plugin"
 )
