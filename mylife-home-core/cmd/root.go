@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"mylife-home-core/pkg/plugins"
+	"mylife-home-core/pkg/store"
 	"os"
 	"os/signal"
 	"syscall"
@@ -37,6 +38,7 @@ var rootCmd = &cobra.Command{
 
 		logger.WithError(errors.Errorf("failed")).Error("bam")
 
+		testStore()
 		testComponent()
 		transport := testBus()
 		testRegistry(transport)
@@ -54,6 +56,29 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func testStore() {
+	st, err := store.MakeStore()
+	if err != nil {
+		panic(err)
+	}
+
+	err = st.Load()
+	if err != nil {
+		panic(err)
+	}
+
+	for _, component := range st.GetComponents() {
+		logger.Infof("Component = '%+v'", component)
+	}
+
+	for _, binding := range st.GetBindings() {
+		logger.Infof("Binding = '%+v'", binding)
+	}
+
+	logger.Infof("%d component, %d bindings", len(st.GetComponents()), len(st.GetBindings()))
+
 }
 
 func testComponent() {
