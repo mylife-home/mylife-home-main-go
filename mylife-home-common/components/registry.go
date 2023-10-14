@@ -55,8 +55,8 @@ func (change *PluginChange) Plugin() *metadata.Plugin {
 }
 
 type RegistryOptions struct {
-	publishRemoteComponents bool
-	transport               *bus.Transport
+	listenRemoteComponents bool
+	transport              *bus.Transport
 }
 
 func NewRegistryOptions() *RegistryOptions {
@@ -64,7 +64,7 @@ func NewRegistryOptions() *RegistryOptions {
 }
 
 func (options *RegistryOptions) PublishRemoteComponents(transport *bus.Transport) *RegistryOptions {
-	options.publishRemoteComponents = true
+	options.listenRemoteComponents = true
 	options.transport = transport
 	return options
 }
@@ -94,7 +94,7 @@ type Registry struct {
 	components         map[string]*ComponentData
 	pluginsPerInstance map[string]*metadata.Plugin
 	instances          map[string]*instanceData
-	publisher          *busPublisher
+	publisher          *busListener
 }
 
 func NewRegistry(options *RegistryOptions) *Registry {
@@ -106,7 +106,7 @@ func NewRegistry(options *RegistryOptions) *Registry {
 		instances:          make(map[string]*instanceData),
 	}
 
-	if options.publishRemoteComponents {
+	if options.listenRemoteComponents {
 		registry.publisher = newBusPublisher(options.transport, registry)
 	}
 

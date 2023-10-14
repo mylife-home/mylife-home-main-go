@@ -12,59 +12,59 @@ import (
 )
 
 // Publish remote components/plugins in the registry
-type busPublisher struct {
+type busListener struct {
 	transport   *bus.Transport
 	registry    *Registry
 	instances   map[string]*busInstance
 	changeToken tools.RegistrationToken
 }
 
-func newBusPublisher(transport *bus.Transport, registry *Registry) *busPublisher {
+func newBusPublisher(transport *bus.Transport, registry *Registry) *busListener {
 	if !transport.Presence().Tracking() {
 		panic("cannot use 'BusPublisher' with presence tracking disabled")
 	}
 
-	publisher := &busPublisher{
+	listener := &busListener{
 		transport: transport,
 		registry:  registry,
 		instances: make(map[string]*busInstance), // only changed from mqtt thread
 	}
 
-	publisher.changeToken = publisher.transport.Presence().OnInstanceChange().Register(publisher.onInstanceChange)
+	listener.changeToken = listener.transport.Presence().OnInstanceChange().Register(listener.onInstanceChange)
 
 	for _, instanceName := range transport.Presence().GetOnlines() {
-		publisher.setInstance(instanceName)
+		listener.setInstance(instanceName)
 	}
 
-	return publisher
+	return listener
 }
 
-func (publisher *busPublisher) Terminate() {
-	publisher.transport.Presence().OnInstanceChange().Unregister(publisher.changeToken)
+func (listener *busListener) Terminate() {
+	listener.transport.Presence().OnInstanceChange().Unregister(listener.changeToken)
 
 	// clone for stability
-	for _, instanceName := range maps.Keys(publisher.instances) {
-		publisher.clearInstance(instanceName)
+	for _, instanceName := range maps.Keys(listener.instances) {
+		listener.clearInstance(instanceName)
 	}
 }
 
-func (publisher *busPublisher) onInstanceChange(change *bus.InstancePresenceChange) {
+func (listener *busListener) onInstanceChange(change *bus.InstancePresenceChange) {
 	if change.Online() {
-		publisher.setInstance(change.InstanceName())
+		listener.setInstance(change.InstanceName())
 	} else {
-		publisher.clearInstance(change.InstanceName())
+		listener.clearInstance(change.InstanceName())
 	}
 }
 
-func (publisher *busPublisher) setInstance(instanceName string) {
-	instance := newBusInstance(publisher.transport, publisher.registry, instanceName)
-	publisher.instances[instanceName] = instance
+func (listener *busListener) setInstance(instanceName string) {
+	instance := newBusInstance(listener.transport, listener.registry, instanceName)
+	listener.instances[instanceName] = instance
 }
 
-func (publisher *busPublisher) clearInstance(instanceName string) {
-	instance := publisher.instances[instanceName]
+func (listener *busListener) clearInstance(instanceName string) {
+	instance := listener.instances[instanceName]
 	instance.Terminate()
-	delete(publisher.instances, instanceName)
+	delete(listener.instances, instanceName)
 }
 
 type busInstance struct {
