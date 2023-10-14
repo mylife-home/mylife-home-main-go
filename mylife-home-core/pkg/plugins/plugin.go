@@ -88,13 +88,7 @@ func (plugin *Plugin) Instantiate(id string, config map[string]any) (*Component,
 		return nil, err
 	}
 
-	comp := &Component{
-		id:      id,
-		plugin:  plugin,
-		target:  target,
-		state:   state,
-		actions: actions,
-	}
+	comp := newComponent(id, plugin, target, state, actions)
 
 	logger.Infof("Component created: '%s'", comp.id)
 	logger.Debugf("Configuration applied (component='%s'): %+v", comp.id, config)

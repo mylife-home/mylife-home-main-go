@@ -10,6 +10,13 @@ type StateChange struct {
 	value any
 }
 
+func NewStateChange(name string, value any) *StateChange {
+	return &StateChange{
+		name:  name,
+		value: value,
+	}
+}
+
 func (change *StateChange) Name() string {
 	return change.name
 }

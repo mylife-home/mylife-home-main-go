@@ -92,17 +92,17 @@ func testComponent() {
 		panic(err)
 	}
 
-	comp.SetOnStateChange(func(name string, value any) {
-		logger.Infof("State '%s' changed to '%v'", name, value)
+	comp.OnStateChange().Register(func(change *components.StateChange) {
+		logger.Infof("State '%s' changed to '%v'", change.Name(), change.Value())
 	})
 
 	logger.Infof("State = '%v'", comp.GetState())
 
 	logger.Infof("Execute")
-	comp.Execute("setValue", false)
+	comp.ExecuteAction("setValue", false)
 
 	logger.Infof("Execute no change")
-	comp.Execute("setValue", false)
+	comp.ExecuteAction("setValue", false)
 
 	logger.Infof("Terminate")
 	comp.Termainte()
@@ -173,11 +173,11 @@ func testLocalComp(transport *bus.Transport) {
 	}
 
 	bcomp.RegisterAction("setValue", func(value []byte) {
-		comp.Execute("setValue", bus.Encoding.ReadBool(value))
+		comp.ExecuteAction("setValue", bus.Encoding.ReadBool(value))
 	})
 
-	comp.SetOnStateChange(func(name string, value any) {
-		err := bcomp.SetState(name, bus.Encoding.WriteBool(value.(bool)))
+	comp.OnStateChange().Register(func(change *components.StateChange) {
+		err := bcomp.SetState(change.Name(), bus.Encoding.WriteBool(change.Value().(bool)))
 		if err != nil {
 			panic(err)
 		}
