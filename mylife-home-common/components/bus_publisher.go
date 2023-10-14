@@ -191,7 +191,7 @@ func (instance *busInstance) setPlugin(id string, value any) {
 		return
 	}
 
-	plugin := metadata.Seralizer.DeserializePlugin(value)
+	plugin := metadata.Serializer.DeserializePlugin(value)
 
 	instance.registry.AddPlugin(instance.instanceName, plugin)
 }
@@ -202,7 +202,7 @@ func (instance *busInstance) setComponent(id string, value any) {
 		return
 	}
 
-	netComp := metadata.Seralizer.DeserializeComponent(value)
+	netComp := metadata.Serializer.DeserializeComponent(value)
 	comp := newBusComponent(instance.transport, instance.instanceName, instance.registry, netComp)
 	instance.registry.AddComponent(instance.instanceName, comp)
 }

@@ -9,7 +9,7 @@ import (
 
 type serializerImpl struct{}
 
-var Seralizer = serializerImpl{}
+var Serializer = serializerImpl{}
 
 type netPlugin struct {
 	Module      string               `json:"module"`
