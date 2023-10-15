@@ -200,3 +200,7 @@ func (typ *ComplexType) String() string {
 func (typ *ComplexType) Validate(value any) bool {
 	return true
 }
+
+func TypeEquals(t1 Type, t2 Type) bool {
+	return t1.String() == t2.String()
+}
