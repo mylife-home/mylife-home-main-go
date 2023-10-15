@@ -192,6 +192,7 @@ func (state *State) updatePartitionLabel(index int, label string) {
 
 		partition.label = label
 		state.partitionLabels[label] = partition
+		logger.Debugf("Partition %d has label %s", index-1, label)
 
 		change = true
 	}
@@ -223,6 +224,7 @@ func (state *State) updateZoneLabel(index int, label string) {
 
 		zone.label = label
 		state.zoneLabels[label] = zone
+		logger.Debugf("Zone %d has label %s", index-1, label)
 
 		change = true
 	}
@@ -248,6 +250,7 @@ func (state *State) updatePartitionStatuses(statuses []commands.PartitionStatusW
 	}
 
 	if change {
+		logger.Debugf("Got partition statuses %+v", statuses)
 		state.notify()
 	}
 }
@@ -268,6 +271,7 @@ func (state *State) updateZoneStatuses(statuses []commands.ZoneStatusWord) {
 	}
 
 	if change {
+		logger.Debugf("Got zone statuses %+v", statuses)
 		state.notify()
 	}
 }
