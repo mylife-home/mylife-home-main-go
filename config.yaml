@@ -3,3 +3,5 @@ bus:
 store:
   type: fs
   path: store.json
+manager:
+  supportsBindings: true

@@ -25,10 +25,6 @@ type busPublisher struct {
 }
 
 func newBusPublisher(transport *bus.Transport, registry *components.Registry) *busPublisher {
-	if !transport.Presence().Tracking() {
-		panic("cannot use 'BusPublisher' with presence tracking disabled")
-	}
-
 	publisher := &busPublisher{
 		transport:     transport,
 		registry:      registry,

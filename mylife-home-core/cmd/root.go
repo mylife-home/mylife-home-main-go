@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"mylife-home-core/pkg/manager"
 	"mylife-home-core/pkg/plugins"
 	"mylife-home-core/pkg/store"
 	"os"
@@ -9,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"mylife-home-common/bus" // tmp
@@ -36,14 +36,35 @@ var rootCmd = &cobra.Command{
 		plugins.Build()
 		instance_info.Init()
 
-		logger.WithError(errors.Errorf("failed")).Error("bam")
+		m, err := manager.MakeManager()
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize manager")
+			return
+		}
 
-		testStore()
-		testComponent()
-		transport := testBus()
-		testRegistry(transport)
-		testExit()
+		waitExit()
+
+		m.Terminate()
+		/*
+			logger.WithError(errors.Errorf("failed")).Error("bam")
+
+			testStore()
+			testComponent()
+			transport := testBus()
+			testRegistry(transport)
+			testExit()
+		*/
 	},
+}
+
+func waitExit() {
+	exit := make(chan os.Signal, 1)
+
+	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
+
+	s := <-exit
+	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+	logger.Debugf("Got signal %s", s)
 }
 
 func init() {

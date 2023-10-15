@@ -9,7 +9,7 @@ type binding struct {
 }
 
 func makeBinding(registry *components.Registry, config *store.BindingConfig) *binding {
-
+	return &binding{}
 }
 
 func (b *binding) Terminate() {
