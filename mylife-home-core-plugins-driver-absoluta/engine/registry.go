@@ -11,7 +11,7 @@ func GetState(key string) *State {
 
 	state, ok := data[key]
 	if !ok {
-		state = &State{}
+		state = makeState()
 		data[key] = state
 	}
 
