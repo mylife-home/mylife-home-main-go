@@ -26,3 +26,5 @@ go run mylife-home-core/main.go --log-console
   - source connects after target
   - target connects after source
 - implements core plugins
+- test 'main'
+- test absoluta
