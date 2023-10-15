@@ -3,6 +3,7 @@ package cmd
 import (
 	"mylife-home-core/pkg/manager"
 	"mylife-home-core/pkg/plugins"
+	"mylife-home-core/pkg/version"
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,7 +25,7 @@ var rootCmd = &cobra.Command{
 	Use:   "mylife-home-core",
 	Short: "mylife-home-core - Mylife Home Core",
 	Run: func(_ *cobra.Command, _ []string) {
-		defines.Init("core")
+		defines.Init("core", version.Value)
 		log.Init(logConsole)
 		config.Init(configFile)
 		plugins.Build()

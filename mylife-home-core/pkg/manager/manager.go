@@ -5,6 +5,7 @@ import (
 	"mylife-home-common/config"
 	"mylife-home-common/instance_info"
 	"mylife-home-common/log"
+	"mylife-home-core/pkg/plugins"
 	"mylife-home-core/pkg/store"
 )
 
@@ -34,6 +35,8 @@ func MakeManager() (*Manager, error) {
 		transport: transport,
 		cm:        cm,
 	}
+
+	manager.addPluginsInstanceInfo()
 
 	if err := manager.transport.Rpc().Serve("components.add", bus.NewRpcService(manager.rpcComponentAdd)); err != nil {
 		return manager, err
@@ -90,6 +93,18 @@ func (manager *Manager) Terminate() {
 
 	manager.cm.Terminate()
 	manager.transport.Terminate()
+}
+
+func (manager *Manager) addPluginsInstanceInfo() {
+	modules := make(map[string]string)
+	for _, id := range plugins.Ids() {
+		meta := plugins.GetPlugin(id).Metadata()
+		modules[meta.Module()] = meta.Version()
+	}
+
+	for module, version := range modules {
+		instance_info.AddComponent("core-plugins-"+module, version)
+	}
 }
 
 func (manager *Manager) rpcComponentAdd(config *store.ComponentConfig) (struct{}, error) {

@@ -6,6 +6,7 @@ import (
 	"mylife-home-common/defines"
 	"mylife-home-common/log"
 	"mylife-home-common/tools"
+	"mylife-home-common/version"
 	"os"
 	"runtime"
 	"strconv"
@@ -78,8 +79,8 @@ func create() *InstanceInfo {
 	data.Versions["os"] = runtime.GOOS + "/" + runtime.GOARCH
 	data.Versions["golang"] = runtime.Version()
 
-	addComponentVersion(data.Versions, "common", "")
-	addComponentVersion(data.Versions, mainComponent, "")
+	addComponentVersion(data.Versions, "common", version.Value)
+	addComponentVersion(data.Versions, mainComponent, defines.MainComponentVersion())
 
 	return newInstanceInfo(data)
 }
