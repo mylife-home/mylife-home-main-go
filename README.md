@@ -18,6 +18,7 @@ go run mylife-home-core/main.go --log-console
 
 ## TODO
 
+- deploy absoluta on kube
 - test bindings
   - normal ops
   - source disconnects
@@ -27,4 +28,5 @@ go run mylife-home-core/main.go --log-console
   - target connects after source
 - implements core plugins
 - test 'main'
-- test absoluta
+- implement mounted-fs store
+- test instance info rpi on rpi
