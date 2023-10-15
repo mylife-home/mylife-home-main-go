@@ -249,9 +249,7 @@ func (bc *busComponent) publishState(name string, value any) {
 	member := bc.component.Plugin().Member(name)
 	data := bus.Encoding.WriteValue(member.ValueType(), value)
 
-	fireAndForget(func() error {
-		return bc.transportComponent.SetState(name, data)
-	})
+	bc.transportComponent.SetState(name, data)
 }
 
 func (bc *busComponent) publishMeta() {
@@ -265,7 +263,7 @@ func (bc *busComponent) unpublishMeta() {
 func (bc *busComponent) publishComponent() {
 	transportComponent, err := bc.transport.Components().AddLocalComponent(bc.component.Id())
 	if err != nil {
-		logger.Errorf("Could not publish local component '%s' on bus: %s", bc.component.Id(), err)
+		logger.WithError(err).Errorf("Could not publish local component '%s' on bus", bc.component.Id())
 		return
 	}
 
@@ -289,22 +287,12 @@ func (bc *busComponent) publishComponent() {
 func (bc *busComponent) registerAction(name string, member *metadata.Member) {
 	typ := member.ValueType()
 
-	fireAndForget(func() error {
-		return bc.transportComponent.RegisterAction(name, func(data []byte) {
-			value := bus.Encoding.ReadValue(typ, data)
-			bc.component.ExecuteAction(name, value)
-		})
+	bc.transportComponent.RegisterAction(name, func(data []byte) {
+		value := bus.Encoding.ReadValue(typ, data)
+		bc.component.ExecuteAction(name, value)
 	})
 }
 
 func (bc *busComponent) unpublishComponent() {
 	bc.transport.Components().RemoveLocalComponent(bc.component.Id())
-}
-
-func fireAndForget(callback func() error) {
-	go func() {
-		if err := callback(); err != nil {
-			logger.WithError(err).Error("Fire and forget failed")
-		}
-	}()
 }

@@ -9,13 +9,13 @@ import (
 const componentsDomain = "components"
 
 type LocalComponent interface {
-	RegisterAction(name string, handler func([]byte)) error
-	SetState(name string, value []byte) error
+	RegisterAction(name string, handler func([]byte))
+	SetState(name string, value []byte)
 }
 
 type RemoteComponent interface {
-	EmitAction(name string, value []byte) error
-	RegisterStateChange(name string, handler func([]byte)) error
+	EmitAction(name string, value []byte)
+	RegisterStateChange(name string, handler func([]byte))
 }
 
 type Components struct {
@@ -112,18 +112,14 @@ func (disp *dispatcher) onMessage(m *message) {
 	handler(m.Payload())
 }
 
-func (disp *dispatcher) AddSubscription(member string, handler func([]byte)) error {
+func (disp *dispatcher) AddSubscription(member string, handler func([]byte)) {
 	if _, exists := disp.subscriptions[member]; exists {
 		panic(fmt.Errorf("member '%s' already registered", member))
 	}
 
 	disp.subscriptions[member] = handler
-	if err := disp.client.Subscribe(disp.buildTopic(member)); err != nil {
-		delete(disp.subscriptions, member)
-		return err
-	}
 
-	return nil
+	disp.client.SubscribeNoWait(disp.buildTopic(member))
 }
 
 func (disp *dispatcher) Terminate() {
@@ -136,20 +132,21 @@ func (disp *dispatcher) Terminate() {
 			topics = append(topics, disp.buildTopic(member))
 		}
 
-		if err := disp.client.Unsubscribe(topics...); err != nil {
-			logger.WithError(err).Error("could not terminate component dispatcher")
-		}
+		disp.client.UnsubscribeNoWait(topics...)
 	}
 }
 
-func (disp *dispatcher) Emit(memberName string, value []byte, persistent bool) error {
+func (disp *dispatcher) Emit(memberName string, value []byte, persistent bool) {
 	topic := disp.buildTopic(memberName)
-	return disp.client.Publish(topic, value, persistent)
+
+	disp.client.PublishNoWait(topic, value, persistent)
 }
 
 func (disp *dispatcher) buildTopic(member string) string {
 	return disp.client.BuildRemoteTopic(disp.instanceName, componentsDomain, disp.componentId, member)
 }
+
+var _ LocalComponent = (*localComponentImpl)(nil)
 
 type localComponentImpl struct {
 	disp *dispatcher
@@ -165,13 +162,15 @@ func (comp *localComponentImpl) Terminate() {
 	comp.disp.Terminate()
 }
 
-func (comp *localComponentImpl) RegisterAction(name string, handler func([]byte)) error {
-	return comp.disp.AddSubscription(name, handler)
+func (comp *localComponentImpl) RegisterAction(name string, handler func([]byte)) {
+	comp.disp.AddSubscription(name, handler)
 }
 
-func (comp *localComponentImpl) SetState(name string, value []byte) error {
-	return comp.disp.Emit(name, value, true)
+func (comp *localComponentImpl) SetState(name string, value []byte) {
+	comp.disp.Emit(name, value, true)
 }
+
+var _ RemoteComponent = (*remoteComponentImpl)(nil)
 
 type remoteComponentImpl struct {
 	disp *dispatcher
@@ -187,10 +186,10 @@ func (comp *remoteComponentImpl) Terminate() {
 	comp.disp.Terminate()
 }
 
-func (comp *remoteComponentImpl) EmitAction(name string, value []byte) error {
-	return comp.disp.Emit(name, value, false)
+func (comp *remoteComponentImpl) EmitAction(name string, value []byte) {
+	comp.disp.Emit(name, value, false)
 }
 
-func (comp *remoteComponentImpl) RegisterStateChange(name string, handler func([]byte)) error {
-	return comp.disp.AddSubscription(name, handler)
+func (comp *remoteComponentImpl) RegisterStateChange(name string, handler func([]byte)) {
+	comp.disp.AddSubscription(name, handler)
 }

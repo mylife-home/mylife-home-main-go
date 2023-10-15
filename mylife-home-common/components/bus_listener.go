@@ -82,19 +82,10 @@ func newBusInstance(transport *bus.Transport, registry *Registry, instanceName s
 		instanceName: instanceName,
 	}
 
-	fireAndForget(func() error {
-		view, err := instance.transport.Metadata().CreateView(instance.instanceName)
-		if err != nil {
-			return err
-		}
-
-		instance.view = view
-		instance.viewChangeToken = instance.view.OnChange().Register(instance.onViewChange)
-
-		instance.initView()
-
-		return nil
-	})
+	view := instance.transport.Metadata().CreateView(instance.instanceName)
+	instance.view = view
+	instance.viewChangeToken = instance.view.OnChange().Register(instance.onViewChange)
+	instance.initView()
 
 	return instance
 }
@@ -111,18 +102,8 @@ func (instance *busInstance) Terminate() {
 		instance.clearPlugin(plugin.Id())
 	}
 
-	fireAndForget(func() error {
-		view := instance.view
-		if view == nil {
-			return fmt.Errorf("terminate: view is nil")
-		}
-
-		view.OnChange().Unregister(instance.viewChangeToken)
-
-		instance.transport.Metadata().CloseView(view)
-
-		return nil
-	})
+	instance.view.OnChange().Unregister(instance.viewChangeToken)
+	instance.transport.Metadata().CloseView(instance.view)
 }
 
 func (instance *busInstance) initView() {
@@ -255,30 +236,19 @@ func newBusComponent(transport *bus.Transport, instanceName string, registry *Re
 		}
 	}
 
-	fireAndForget(func() error {
-		for name := range comp.state {
-			// Else it seems that the name inside the closure in incorrect
-			closedName := name
-			err := comp.remoteComponent.RegisterStateChange(name, func(data []byte) {
-				comp.stateChange(closedName, data)
-			})
-
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	for name := range comp.state {
+		// Else it seems that the name inside the closure in incorrect
+		closedName := name
+		comp.remoteComponent.RegisterStateChange(name, func(data []byte) {
+			comp.stateChange(closedName, data)
+		})
+	}
 
 	return comp
 }
 
 func (comp *busComponent) Terminate() {
-	fireAndForget(func() error {
-		comp.transport.Components().UntrackRemoteComponent(comp.remoteComponent)
-		return nil
-	})
+	comp.transport.Components().UntrackRemoteComponent(comp.remoteComponent)
 }
 
 func (comp *busComponent) OnStateChange() tools.CallbackRegistration[*StateChange] {
@@ -328,15 +298,5 @@ func (comp *busComponent) ExecuteAction(name string, value any) {
 	}
 
 	data := bus.Encoding.WriteValue(member.ValueType(), value)
-	fireAndForget(func() error {
-		return comp.remoteComponent.EmitAction(name, data)
-	})
-}
-
-func fireAndForget(callback func() error) {
-	go func() {
-		if err := callback(); err != nil {
-			logger.WithError(err).Error("Fire and forget failed")
-		}
-	}()
+	comp.remoteComponent.EmitAction(name, data)
 }

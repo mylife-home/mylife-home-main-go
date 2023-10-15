@@ -140,13 +140,13 @@ func (svc *rpcServiceImpl[TInput, TOutput]) onMessage(m *message) {
 		return
 	}
 
-	fireAndForget(func() error {
+	go func() {
 		var req request[TInput]
 		Encoding.ReadTypedJson(m.Payload(), &req)
 		resp := svc.handle(&req)
 		output := Encoding.WriteJson(resp)
-		return svc.client.Publish(req.ReplyTopic, output, false)
-	})
+		svc.client.PublishNoWait(req.ReplyTopic, output, false)
+	}()
 }
 
 func (svc *rpcServiceImpl[TInput, TOutput]) handle(req *request[TInput]) *response[TOutput] {

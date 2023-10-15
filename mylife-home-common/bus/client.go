@@ -45,14 +45,16 @@ func (m *message) Retained() bool {
 }
 
 type client struct {
-	instanceName      string
-	mqtt              mqtt.Client
-	online            bool
-	onlineSync        sync.RWMutex
-	onOnlineChanged   *tools.CallbackManager[bool]
-	onMessage         *tools.CallbackManager[*message]
-	subscriptions     map[string]struct{}
-	subscriptionsSync sync.RWMutex
+	instanceName        string
+	mqtt                mqtt.Client
+	online              bool
+	onlineSync          sync.RWMutex
+	onOnlineChanged     *tools.CallbackManager[bool]
+	onMessage           *tools.CallbackManager[*message]
+	subscriptions       map[string]struct{}
+	subscriptionsSync   sync.RWMutex
+	sendQueue           chan func() error
+	sendQueueWorkerSync sync.WaitGroup
 }
 
 func newClient(instanceName string) *client {
@@ -65,6 +67,7 @@ func newClient(instanceName string) *client {
 		onOnlineChanged: tools.NewCallbackManager[bool](),
 		onMessage:       tools.NewCallbackManager[*message](),
 		subscriptions:   make(map[string]struct{}),
+		sendQueue:       make(chan func() error, 1024),
 	}
 
 	options := mqtt.NewClientOptions()
@@ -116,8 +119,11 @@ func newClient(instanceName string) *client {
 
 	client.mqtt = mqtt.NewClient(options)
 
+	client.sendQueueWorkerSync.Add(1)
+	go client.sendQueueWorker()
+
 	// Note: with auto-retry, the connection may not fail, or for a severe reason (eg: bad config)
-	fireAndForget(func() error {
+	client.fireAndForget(func() error {
 		return tokenSync(client.mqtt.Connect())
 	})
 
@@ -136,10 +142,36 @@ func (client *client) Terminate() {
 	}
 
 	client.mqtt.Disconnect(100)
+
+	close(client.sendQueue)
+	client.sendQueueWorkerSync.Wait()
 }
 
 func (client *client) InstanceName() string {
 	return client.instanceName
+}
+
+func (client *client) sendQueueWorker() {
+	defer client.sendQueueWorkerSync.Done()
+
+	for operation := range client.sendQueue {
+		if err := operation(); err != nil {
+			logger.WithError(err).Error("Send queued operation failed")
+		}
+	}
+}
+
+// maintains ordered tasks compared to fireAndForget
+func (client *client) sendQueueAdd(operation func() error) {
+	client.sendQueue <- operation
+}
+
+func (client *client) fireAndForget(callback func() error) {
+	go func() {
+		if err := callback(); err != nil {
+			logger.WithError(err).Error("Fire and forget failed")
+		}
+	}()
 }
 
 func (client *client) onConnectionLost(err error) {
@@ -154,7 +186,7 @@ func (client *client) onConnectionLost(err error) {
 }
 
 func (client *client) onConnect() {
-	fireAndForget(func() error {
+	client.fireAndForget(func() error {
 		// given the spec, it is unclear if LWT should be executed in case of client takeover, so we run it to be sure
 		if err := client.ClearRetain(client.BuildTopic(presenceDomain)); err != nil {
 			return err
@@ -233,7 +265,7 @@ func (client *client) clearResidentState() error {
 		// only clear real retained messages
 		if m.Retained() && len(m.Payload()) > 0 && strings.HasPrefix(m.Topic(), client.instanceName+"/") {
 			newTopic <- struct{}{}
-			fireAndForget(func() error {
+			client.fireAndForget(func() error {
 				return client.ClearRetain(m.Topic())
 			})
 		}
@@ -290,6 +322,12 @@ func (client *client) Publish(topic string, payload []byte, retain bool) error {
 	return tokenSync(client.PublishAsync(topic, payload, retain))
 }
 
+func (client *client) PublishNoWait(topic string, payload []byte, retain bool) {
+	client.sendQueueAdd(func() error {
+		return client.Publish(topic, payload, retain)
+	})
+}
+
 func (client *client) SubscribeAsync(topics ...string) mqtt.Token {
 	client.subscriptionsAdd(topics)
 
@@ -308,6 +346,12 @@ func (client *client) SubscribeAsync(topics ...string) mqtt.Token {
 
 func (client *client) Subscribe(topics ...string) error {
 	return tokenSync(client.SubscribeAsync(topics...))
+}
+
+func (client *client) SubscribeNoWait(topics ...string) {
+	client.sendQueueAdd(func() error {
+		return client.Subscribe(topics...)
+	})
 }
 
 func (client *client) subscriptionsAdd(topics []string) {
@@ -333,6 +377,12 @@ func (client *client) Unsubscribe(topics ...string) error {
 	return tokenSync(client.UnsubscribeAsync(topics...))
 }
 
+func (client *client) UnsubscribeNoWait(topics ...string) {
+	client.sendQueueAdd(func() error {
+		return client.Unsubscribe(topics...)
+	})
+}
+
 func (client *client) subscriptionsDel(topics []string) {
 	client.subscriptionsSync.Lock()
 	defer client.subscriptionsSync.Unlock()
@@ -340,14 +390,6 @@ func (client *client) subscriptionsDel(topics []string) {
 	for _, topic := range topics {
 		delete(client.subscriptions, topic)
 	}
-}
-
-func fireAndForget(callback func() error) {
-	go func() {
-		if err := callback(); err != nil {
-			logger.WithError(err).Error("Fire and forget failed")
-		}
-	}()
 }
 
 func tokenSync(token mqtt.Token) error {

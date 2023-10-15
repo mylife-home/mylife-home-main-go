@@ -51,20 +51,16 @@ func newMetadata(client *client) *Metadata {
 func (meta *Metadata) Set(path string, value any) {
 	topic := meta.client.BuildTopic(metadataDomain, path)
 
-	fireAndForget(func() error {
-		return meta.client.Publish(topic, Encoding.WriteJson(value), true)
-	})
+	meta.client.PublishNoWait(topic, Encoding.WriteJson(value), true)
 }
 
 func (meta *Metadata) Clear(path string) {
 	topic := meta.client.BuildTopic(metadataDomain, path)
 
-	fireAndForget(func() error {
-		return meta.client.Publish(topic, []byte{}, true)
-	})
+	meta.client.PublishNoWait(topic, []byte{}, true)
 }
 
-func (meta *Metadata) CreateView(remoteInstanceName string) (RemoteMetadataView, error) {
+func (meta *Metadata) CreateView(remoteInstanceName string) RemoteMetadataView {
 	view := &remoteMetadataView{
 		client:       meta.client,
 		instanceName: remoteInstanceName,
@@ -74,21 +70,16 @@ func (meta *Metadata) CreateView(remoteInstanceName string) (RemoteMetadataView,
 
 	view.msgToken = view.client.OnMessage().Register(view.onMessage)
 
-	if err := view.client.Subscribe(view.listenTopic()); err != nil {
-		view.client.OnMessage().Unregister(view.msgToken)
-		return nil, err
-	}
+	view.client.SubscribeNoWait(view.listenTopic())
 
-	return view, nil
+	return view
 }
 
 func (meta *Metadata) CloseView(view RemoteMetadataView) {
 	viewImpl := view.(*remoteMetadataView)
 	viewImpl.client.OnMessage().Unregister(viewImpl.msgToken)
 
-	if err := viewImpl.client.Unsubscribe(viewImpl.listenTopic()); err != nil {
-		logger.WithError(err).Warnf("Error closing view to '%s'", view.InstanceName())
-	}
+	viewImpl.client.UnsubscribeNoWait(viewImpl.listenTopic())
 }
 
 type remoteMetadataView struct {
