@@ -124,7 +124,7 @@ func (client *Client) connection() {
 
 	conn, err := makeConnection(client.ctx, client.servAddr)
 	if err != nil {
-		logger.Errorf("Could not connect to '%s': %s", client.servAddr, err)
+		logger.WithError(err).Errorf("Could not connect to '%s'", client.servAddr)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (client *Client) connection() {
 	logger.Debug("Start handshake")
 
 	if err := handshake(client.ctx, client.conn, client.pin); err != nil {
-		logger.Errorf("Handshake failed: %s", err)
+		logger.WithError(err).Error("Handshake failed")
 		return
 	}
 
@@ -162,7 +162,7 @@ func (client *Client) connection() {
 			go client.heartbeat()
 
 		case err := <-client.conn.Errors():
-			logger.Errorf("Error on connection: %s", err)
+			logger.WithError(err).Error("Error on connection")
 			return
 
 		case cmd := <-client.conn.Read():
@@ -233,7 +233,7 @@ func (client *Client) heartbeat() {
 	}
 
 	if err := client.executeCommand(cmd); err != nil {
-		logger.Errorf("Heartbeat error: %s", err)
+		logger.WithError(err).Errorf("Heartbeat error")
 	}
 
 	logger.Debugf("Heartbeat OK")

@@ -64,7 +64,7 @@ func (svc *Service) connectionLoop() {
 				return
 			}
 
-			logger.Errorf("Error reading partition statuses: %s", err)
+			logger.WithError(err).Error("Error reading partition statuses")
 		} else {
 			state.updatePartitionStatuses(statuses.GetData())
 		}
@@ -74,7 +74,7 @@ func (svc *Service) connectionLoop() {
 				return
 			}
 
-			logger.Errorf("Error reading zone statuses: %s", err)
+			logger.WithError(err).Error("Error reading zone statuses")
 		} else {
 			state.updateZoneStatuses(statuses.GetData())
 		}
@@ -101,7 +101,7 @@ func (svc *Service) handleNotification(cmd commands.Command) {
 			go func(index int) {
 				label, err := client.GetPartitionLabel(index)
 				if err != nil {
-					logger.Errorf("Error reading partition label %d: %s\n", index, err)
+					logger.WithError(err).Errorf("Error reading partition label %d", index)
 					return
 				}
 
@@ -119,7 +119,7 @@ func (svc *Service) handleNotification(cmd commands.Command) {
 			go func(index int) {
 				label, err := client.GetZoneLabel(index)
 				if err != nil {
-					logger.Errorf("Error reading zone label %d: %s\n", index, err)
+					logger.WithError(err).Errorf("Error reading zone label %d", index)
 					return
 				}
 
