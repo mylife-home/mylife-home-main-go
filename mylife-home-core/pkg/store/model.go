@@ -30,11 +30,19 @@ type ComponentConfig struct {
 	Config map[string]any `json:"config"`
 }
 
+func (config *ComponentConfig) String() string {
+	return fmt.Sprintf("%s (type=%s, config=%+v)", config.Id, config.Plugin, config.Config)
+}
+
 type BindingConfig struct {
 	SourceComponent string `json:"sourceComponent"`
 	SourceState     string `json:"sourceState"`
 	TargetComponent string `json:"targetComponent"`
 	TargetAction    string `json:"targetAction"`
+}
+
+func (config *BindingConfig) String() string {
+	return fmt.Sprintf("%s.%s -> %s.%s", config.SourceComponent, config.SourceState, config.TargetComponent, config.TargetAction)
 }
 
 func modelDeserialize(data []byte) ([]storeItem, error) {

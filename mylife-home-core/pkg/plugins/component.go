@@ -69,6 +69,6 @@ func (comp *Component) ExecuteAction(name string, value any) {
 	action(value)
 }
 
-func (comp *Component) Termainte() {
+func (comp *Component) Terminate() {
 	comp.target.Terminate()
 }

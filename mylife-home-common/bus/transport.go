@@ -59,6 +59,10 @@ func NewTransport(options *Options) *Transport {
 	return transport
 }
 
+func (transport *Transport) Terminate() {
+	transport.client.Terminate()
+}
+
 func (transport *Transport) Rpc() *Rpc {
 	return transport.rpc
 }

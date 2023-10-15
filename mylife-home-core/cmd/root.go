@@ -105,7 +105,7 @@ func testComponent() {
 	comp.ExecuteAction("setValue", false)
 
 	logger.Infof("Terminate")
-	comp.Termainte()
+	comp.Terminate()
 }
 
 const pluginMeta = `
