@@ -112,9 +112,14 @@ func (instance *busInstance) Terminate() {
 	}
 
 	fireAndForget(func() error {
-		instance.view.OnChange().Unregister(instance.viewChangeToken)
+		view := instance.view
+		if view == nil {
+			return fmt.Errorf("terminate: view is nil")
+		}
 
-		instance.transport.Metadata().CloseView(instance.view)
+		view.OnChange().Unregister(instance.viewChangeToken)
+
+		instance.transport.Metadata().CloseView(view)
 
 		return nil
 	})
