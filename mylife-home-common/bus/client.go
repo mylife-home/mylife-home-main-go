@@ -15,7 +15,6 @@ type busConfig struct {
 }
 
 type OnlineChangedHandler func(bool)
-type messageHandler func(*message)
 
 type message struct {
 	instanceName string
