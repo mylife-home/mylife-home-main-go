@@ -15,3 +15,14 @@ go generate mylife-home-core-plugins-driver-absoluta/main.go
 ```shell
 go run mylife-home-core/main.go --log-console
 ```
+
+## TODO
+
+- test bindings
+  - normal ops
+  - source disconnects
+  - target disconnects
+  - binding types does not match
+  - source connects after target
+  - target connects after source
+- implements core plugins
