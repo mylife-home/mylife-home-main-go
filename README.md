@@ -18,8 +18,9 @@ MyLife Home Core, Golang implementation
 ## Generate
 
 ```shell
-go generate mylife-home-core-plugins/logic-base/main.go 
-go generate mylife-home-core-plugins/driver-absoluta/main.go 
+go generate mylife-home-core-plugins/driver-absoluta/main.go
+go generate mylife-home-core-plugins/logic-base/main.go
+go generate mylife-home-core-plugins/ui-base/main.go
 
 ```
 
