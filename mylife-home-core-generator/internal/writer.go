@@ -155,6 +155,7 @@ func renderStringLiteral(value string) string {
 	// annotation lexer split the strings into []byte, then encode them back using 'str += string(b)
 	// this crashed UTF8 encoding.
 	// We fix that doing the reverse process: converting the runes back to bytes, and reassembling the string from []byte.
+	// https://github.com/YReshetko/go-annotation/issues/29
 
 	raw := make([]byte, 0)
 	for _, rune := range value {
