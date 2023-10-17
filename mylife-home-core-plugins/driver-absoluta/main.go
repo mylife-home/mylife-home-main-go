@@ -1,4 +1,4 @@
-//go:generate go run ../mylife-home-core-generator/cmd/main.go .
+//go:generate go run ../../mylife-home-core-generator/cmd/main.go .
 
 package plugin_entry
 
