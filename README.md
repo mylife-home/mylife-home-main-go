@@ -2,21 +2,28 @@
 
 MyLife Home Core, Golang implementation
 
-## generate
+## New plugin
+
+- new folder in `mylife-home-core-plugins/`
+- Add `Generate` doc below
+- Add generate in `Dockerfile`
+- Add plugin in `mylife-home-core/main.go`
+
+## Generate
 
 ```shell
-go generate mylife-home-core-plugins-logic-base/main.go 
-go generate mylife-home-core-plugins-driver-absoluta/main.go 
+go generate mylife-home-core-plugins/logic-base/main.go 
+go generate mylife-home-core-plugins/driver-absoluta/main.go 
 
 ```
 
-## run
+## Run
 
 ```shell
 go run mylife-home-core/main.go --log-console
 ```
 
-## publish
+## Publish
 
 ```shell
 # TODO: update version
