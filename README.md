@@ -2,6 +2,12 @@
 
 MyLife Home Core, Golang implementation
 
+## Bump
+
+- common: `mylife-home-common/version/value.go`
+- core: `mylife-home-core/pkg/version/value.go`
+- plugins: `mylife-home-core-plugins/*/main.go`
+
 ## New plugin
 
 - new folder in `mylife-home-core-plugins/`
