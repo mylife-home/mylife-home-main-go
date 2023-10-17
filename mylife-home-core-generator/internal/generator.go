@@ -279,7 +279,7 @@ func parseType(provided string, native string) metadata.Type {
 	}
 
 	providedType, err := metadata.ParseType(provided)
-	panics.IsTrue(err != nil, "%f", err)
+	panics.IsTrue(err == nil, "Error parsing type '%s': %s", provided, err)
 
 	switch providedType.(type) {
 	case *metadata.RangeType:
