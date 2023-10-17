@@ -36,11 +36,9 @@ type PluginData struct {
 	name        string
 	description string
 	usage       metadata.PluginUsage
-	version     string
 }
 
 type StateData struct {
-	typeName  string
 	fieldName string
 
 	field *ast.Field
@@ -64,7 +62,6 @@ type ActionData struct {
 }
 
 type ConfigData struct {
-	typeName  string
 	fieldName string
 
 	field *ast.Field
@@ -109,15 +106,9 @@ func (generator *Generator) ProcessPluginAnnotation(node annotation.Node, plugin
 
 func (generator *Generator) ProcessStateAnnotation(node annotation.Node, ann *State) {
 	field, ok := annotation.CastNode[*ast.Field](node)
-	panics.IsTrue(ok)
-
-	typ, ok := annotation.ParentType[*ast.TypeSpec](node)
-	panics.IsTrue(ok)
-	astType, ok := annotation.CastNode[*ast.TypeSpec](typ)
-	panics.IsTrue(ok)
+	panics.IsTrue(ok, "Bad state annotation: %s", getNodeLocation(node))
 
 	generator.states = append(generator.states, &StateData{
-		typeName:  astType.Name.Name,
 		fieldName: field.Names[0].Name,
 		field:     field,
 		ann:       ann,
@@ -126,10 +117,10 @@ func (generator *Generator) ProcessStateAnnotation(node annotation.Node, ann *St
 
 func (generator *Generator) ProcessActionAnnotation(node annotation.Node, ann *Action) {
 	fn, ok := annotation.CastNode[*ast.FuncDecl](node)
-	panics.IsTrue(ok)
+	panics.IsTrue(ok, "Bad action annotation: %s", getNodeLocation(node))
 
 	astPtr, ok := fn.Recv.List[0].Type.(*ast.StarExpr)
-	panics.IsTrue(ok) // Else the function receiver is not a pointer
+	panics.IsTrue(ok, "Bad action annotation: %s", getNodeLocation(node)) // Else the function receiver is not a pointer
 
 	generator.actions = append(generator.actions, &ActionData{
 		typeName: astPtr.X.(*ast.Ident).Name,
@@ -141,15 +132,9 @@ func (generator *Generator) ProcessActionAnnotation(node annotation.Node, ann *A
 
 func (generator *Generator) ProcessConfigAnnotation(node annotation.Node, ann *Config) {
 	field, ok := annotation.CastNode[*ast.Field](node)
-	panics.IsTrue(ok)
-
-	typ, ok := annotation.ParentType[*ast.TypeSpec](node)
-	panics.IsTrue(ok)
-	astType, ok := annotation.CastNode[*ast.TypeSpec](typ)
-	panics.IsTrue(ok)
+	panics.IsTrue(ok, "Bad config annotation: %s", getNodeLocation(node))
 
 	generator.configs = append(generator.configs, &ConfigData{
-		typeName:  astType.Name.Name,
 		fieldName: field.Names[0].Name,
 		field:     field,
 		ann:       ann,
@@ -163,32 +148,37 @@ func (generator *Generator) Output() []byte {
 }
 
 func (generator *Generator) associate() {
-	m := make(map[string]*PluginData)
+
+	pluginByTypeName := make(map[string]*PluginData)
+	pluginByField := make(map[ast.Node]*PluginData)
 
 	for _, plugin := range generator.plugins {
 		plugin.states = make([]*StateData, 0)
 		plugin.actions = make([]*ActionData, 0)
 		plugin.configs = make([]*ConfigData, 0)
 
-		m[plugin.typeName] = plugin
+		pluginByTypeName[plugin.typeName] = plugin
+		for _, field := range getStructFields(plugin.typ) {
+			pluginByField[field] = plugin
+		}
 	}
 
 	for _, state := range generator.states {
-		plugin, ok := m[state.typeName]
+		plugin, ok := pluginByField[state.field]
 		panics.IsTrue(ok)
 
 		plugin.states = append(plugin.states, state)
 	}
 
 	for _, action := range generator.actions {
-		plugin, ok := m[action.typeName]
+		plugin, ok := pluginByTypeName[action.typeName]
 		panics.IsTrue(ok)
 
 		plugin.actions = append(plugin.actions, action)
 	}
 
 	for _, config := range generator.configs {
-		plugin, ok := m[config.typeName]
+		plugin, ok := pluginByField[config.field]
 		panics.IsTrue(ok)
 
 		plugin.configs = append(plugin.configs, config)
@@ -366,4 +356,28 @@ func (generator *Generator) write() []byte {
 	}
 
 	return writer.Content()
+}
+
+func getStructFields(node *ast.TypeSpec) []ast.Node {
+	visitor := structFieldsVisitor{
+		fields: make([]ast.Node, 0),
+	}
+
+	ast.Walk(&visitor, node)
+
+	return visitor.fields
+}
+
+type structFieldsVisitor struct {
+	fields []ast.Node
+}
+
+func (visitor *structFieldsVisitor) Visit(node ast.Node) ast.Visitor {
+	if field, ok := node.(*ast.Field); ok {
+
+		visitor.fields = append(visitor.fields, field)
+		return nil
+	}
+
+	return visitor
 }
