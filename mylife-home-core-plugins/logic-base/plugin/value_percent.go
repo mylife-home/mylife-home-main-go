@@ -15,13 +15,13 @@ type ValuePercent struct {
 	// @Config(name="offValue" description="Valeur définie lorsqu'on passe à OFF. Typiquement 0 (Note: peut être écrasé par l'action 'setOffValue'")
 	ConfigOffValue int64
 
-	// @State(type=range[0;100] description="Valeur partir de laquelle toggle passe à OFF ou ON. Typiquement 1")
+	// @State(type="range[0;100]" description="Valeur partir de laquelle toggle passe à OFF ou ON. Typiquement 1")
 	ToggleThreshold definitions.State[int64]
 
-	// @State(type=range[0;100] description="Valeur définie lorsqu'on passe à ON. Typiquement 100")
+	// @State(type="range[0;100]" description="Valeur définie lorsqu'on passe à ON. Typiquement 100")
 	OnValue definitions.State[int64]
 
-	// @State(type=range[0;100] description="Valeur définie lorsqu'on passe à OFF. Typiquement 0")
+	// @State(type="range[0;100]" description="Valeur définie lorsqu'on passe à OFF. Typiquement 0")
 	OffValue definitions.State[int64]
 
 	// @State(type="range[0;100]")
