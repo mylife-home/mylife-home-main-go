@@ -21,7 +21,7 @@ func MakeEngine() *Engine {
 func (engine *Engine) getOutputPath(node annotation.Node) string {
 	//filename := node.Meta().FileName()
 	//filename = filename[:len(filename)-2] + "annotations-generated.go"
-	filename := "_plugins-annotations-generated.go"
+	filename := "zzz_plugins_annotations_generated.go"
 	return path.Join(node.Meta().Dir(), filename)
 }
 
