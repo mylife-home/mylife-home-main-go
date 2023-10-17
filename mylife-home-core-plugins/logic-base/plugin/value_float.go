@@ -1,25 +1,23 @@
 package plugin
 
 import (
+	"math"
 	"mylife-home-core-library/definitions"
 )
 
-// @Plugin(description="binary value description" usage="logic")
+// @Plugin(usage="logic")
 type ValueFloat struct {
-	// @Config(description="initial value")
-	InitialValue float64
-
-	// @State(description="current value")
+	// @State()
 	Value definitions.State[float64]
 }
 
-// @Action(description="set current value")
+// @Action()
 func (component *ValueFloat) SetValue(arg float64) {
 	component.Value.Set(arg)
 }
 
 func (component *ValueFloat) Init() error {
-	component.Value.Set(component.InitialValue)
+	component.Value.Set(math.NaN())
 	return nil
 }
 

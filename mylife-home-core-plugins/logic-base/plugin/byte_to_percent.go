@@ -7,7 +7,7 @@ import (
 // @Plugin(usage="logic")
 type ByteToPercent struct {
 
-	// @State(type=range[0;100])
+	// @State(type="range[0;100]")
 	Value definitions.State[int64]
 }
 
@@ -19,7 +19,7 @@ func (component *ByteToPercent) Terminate() {
 	// Noop
 }
 
-// @Action(type=range[0;255])
+// @Action(type="range[0;255]")
 func (component *ByteToPercent) Set(arg int64) {
 	component.Value.Set(arg * 100 / 255)
 }

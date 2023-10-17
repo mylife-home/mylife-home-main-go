@@ -12,7 +12,7 @@ type BinaryToPercent struct {
 	// @Config()
 	High int64
 
-	// @State(type=range[0;100])
+	// @State(type="range[0;100]")
 	Value definitions.State[int64]
 }
 

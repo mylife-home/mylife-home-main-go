@@ -9,7 +9,7 @@ type ConstantByte struct {
 	// @Config(name="value")
 	ConfigValue int64
 
-	// @State(type=range[0;255])
+	// @State(type="range[0;255]")
 	Value definitions.State[int64]
 }
 
