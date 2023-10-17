@@ -9,8 +9,9 @@ import (
 )
 
 type Engine struct {
-	generators map[string]*Generator
-	outputDone bool
+	generators       map[string]*Generator
+	moduleAnnotation *Module
+	outputDone       bool
 }
 
 func MakeEngine() *Engine {
@@ -37,10 +38,27 @@ func (engine *Engine) getGenerator(node annotation.Node) *Generator {
 
 	if _, ok := engine.generators[outputPath]; !ok {
 		moduleName := engine.getModuleName(node)
-		engine.generators[outputPath] = MakeGenerator(node, outputPath, moduleName)
+		generator := MakeGenerator(node, outputPath, moduleName)
+		engine.generators[outputPath] = generator
+
+		if engine.moduleAnnotation != nil {
+			generator.ProcessModuleAnnotation(engine.moduleAnnotation)
+		}
 	}
 
 	return engine.generators[outputPath]
+}
+
+func (engine *Engine) ProcessModuleAnnotations(node annotation.Node, annotations []Module) {
+	panics.IsTrue(len(annotations) == 1)
+
+	// Distribute it to each generator
+	// Keep it for later-created generators
+	engine.moduleAnnotation = &annotations[0]
+
+	for _, generator := range engine.generators {
+		generator.ProcessModuleAnnotation(engine.moduleAnnotation)
+	}
 }
 
 func (engine *Engine) ProcessPluginAnnotations(node annotation.Node, annotations []Plugin) {

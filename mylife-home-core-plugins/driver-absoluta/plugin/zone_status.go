@@ -5,7 +5,7 @@ import (
 	"mylife-home-core-plugins-driver-absoluta/engine"
 )
 
-// @Plugin(description="Fournit la valeur d'un indicateur composant l'état d'une zone" usage="sensor" version="1.0.0")
+// @Plugin(description="Fournit la valeur d'un indicateur composant l'état d'une zone" usage="sensor")
 type ZoneStatus struct {
 	// @Config(description="Clé de partage avec la connexion")
 	Key string

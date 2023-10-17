@@ -12,9 +12,10 @@ import (
 )
 
 type Generator struct {
-	outputPath  string
-	moduleName  string
-	packageName string
+	outputPath    string
+	moduleName    string
+	moduleVersion string
+	packageName   string
 
 	plugins []*PluginData
 	states  []*StateData
@@ -84,6 +85,14 @@ func MakeGenerator(node annotation.Node, outputPath string, moduleName string) *
 		actions:     make([]*ActionData, 0),
 		configs:     make([]*ConfigData, 0),
 	}
+}
+
+func (generator *Generator) ProcessModuleAnnotation(moduleAnnotation *Module) {
+	if moduleAnnotation.Name != "" {
+		generator.moduleName = makeModuleName(moduleAnnotation.Name)
+	}
+
+	generator.moduleVersion = moduleAnnotation.Version
 }
 
 func (generator *Generator) ProcessPluginAnnotation(node annotation.Node, pluginAnnotation *Plugin) {
@@ -187,6 +196,8 @@ func (generator *Generator) associate() {
 }
 
 func (generator *Generator) enrich() {
+	panics.IsTrue(generator.moduleVersion != "", "No module version provided.")
+
 	for _, plugin := range generator.plugins {
 		plugin.name = plugin.ann.Name
 		if plugin.name == "" {
@@ -196,9 +207,6 @@ func (generator *Generator) enrich() {
 		plugin.description = plugin.ann.Description
 
 		plugin.usage = parsePluginUsage(plugin.ann.Usage)
-
-		panics.IsTrue(plugin.ann.Version != "")
-		plugin.version = plugin.ann.Version
 
 		for _, state := range plugin.states {
 			state.name = state.ann.Name
@@ -324,6 +332,10 @@ func parseConfigType(native string) metadata.ConfigType {
 	}
 }
 
+func makeModuleName(name string) string {
+	return strcase.ToKebab(name)
+}
+
 func makePluginName(name string) string {
 	return strcase.ToKebab(name)
 }
@@ -336,7 +348,7 @@ func (generator *Generator) write() []byte {
 	writer := MakeWrite(generator.packageName)
 
 	for _, plugin := range generator.plugins {
-		writer.BeginPlugin(plugin.typeName, generator.moduleName, plugin.name, plugin.description, plugin.usage, plugin.version)
+		writer.BeginPlugin(plugin.typeName, generator.moduleName, plugin.name, plugin.description, plugin.usage, generator.moduleVersion)
 
 		for _, state := range plugin.states {
 			writer.AddState(state.fieldName, state.name, state.description, state.valueType)

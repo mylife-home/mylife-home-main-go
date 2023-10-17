@@ -5,7 +5,7 @@ import (
 	"mylife-home-core-plugins-driver-absoluta/engine"
 )
 
-// @Plugin(description="connexion vers centrale d'alarme Bentel Absoluta" usage="sensor" version="1.0.0")
+// @Plugin(description="connexion vers centrale d'alarme Bentel Absoluta" usage="sensor")
 type Connection struct {
 	// @Config(description="Clé de partage avec les autres composants")
 	Key string

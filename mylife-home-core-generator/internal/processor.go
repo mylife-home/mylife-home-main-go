@@ -16,16 +16,41 @@ const (
 func init() {
 	engine := MakeEngine()
 
+	annotation.Register[Module](&ModuleAnnotationProcessor{engine})
 	annotation.Register[Plugin](&PluginAnnotationProcessor{engine})
 	annotation.Register[State](&StateAnnotationProcessor{engine})
 	annotation.Register[Action](&ActionAnnotationProcessor{engine})
 	annotation.Register[Config](&ConfigAnnotationProcessor{engine})
 }
 
+var _ annotation.AnnotationProcessor = (*ModuleAnnotationProcessor)(nil)
 var _ annotation.AnnotationProcessor = (*PluginAnnotationProcessor)(nil)
 var _ annotation.AnnotationProcessor = (*StateAnnotationProcessor)(nil)
 var _ annotation.AnnotationProcessor = (*ActionAnnotationProcessor)(nil)
 var _ annotation.AnnotationProcessor = (*ConfigAnnotationProcessor)(nil)
+
+type ModuleAnnotationProcessor struct {
+	engine *Engine
+}
+
+func (processor *ModuleAnnotationProcessor) Process(node annotation.Node) error {
+	annotations := annotation.FindAnnotations[Module](node.Annotations())
+	processor.engine.ProcessModuleAnnotations(node, annotations)
+
+	return nil
+}
+
+func (processor *ModuleAnnotationProcessor) Output() map[string][]byte {
+	return processor.engine.Output()
+}
+
+func (processor *ModuleAnnotationProcessor) Version() string {
+	return "0.0.1"
+}
+
+func (processor *ModuleAnnotationProcessor) Name() string {
+	return "MylifeHomeModuleAnnotationProcessor"
+}
 
 type PluginAnnotationProcessor struct {
 	engine *Engine
