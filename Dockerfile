@@ -4,8 +4,8 @@ WORKDIR /src
 COPY . .
 
 RUN go mod download
-RUN go generate mylife-home-core-plugins-logic-base/main.go 
-RUN go generate mylife-home-core-plugins-driver-absoluta/main.go 
+RUN go generate mylife-home-core-plugins/logic-base/main.go 
+RUN go generate mylife-home-core-plugins/driver-absoluta/main.go 
 # RUN go vet -v
 # RUN go test -v
 
