@@ -152,6 +152,16 @@ func renderConfigType(configType metadata.ConfigType) string {
 }
 
 func renderStringLiteral(value string) string {
+	// annotation lexer split the strings into []byte, then encode them back using 'str += string(b)
+	// this crashed UTF8 encoding.
+	// We fix that doing the reverse process: converting the runes back to bytes, and reassembling the string from []byte.
+
+	raw := make([]byte, 0)
+	for _, rune := range value {
+		raw = append(raw, byte(rune))
+	}
+	value = string(raw)
+
 	// Consider for now json and golang string same
 	raw, err := json.Marshal(value)
 	if err != nil {
