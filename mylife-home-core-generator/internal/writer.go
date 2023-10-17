@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"mylife-home-common/components/metadata"
 	"strings"
@@ -40,21 +41,38 @@ func (writer *Writer) appendLinef(format string, a ...any) {
 
 func (writer *Writer) BeginPlugin(pluginType string, module string, name string, description string, usage metadata.PluginUsage, version string) {
 	writer.appendLine(`func init() {`)
-	writer.appendLinef(`	builder := registry.MakePluginTypeBuilder[%s]("%s", "%s", "%s", %s, "%s")`,
-		pluginType, module, name, description, renderPluginUsage(usage), version)
+	writer.appendLinef(`	builder := registry.MakePluginTypeBuilder[%s](%s, %s, %s, %s, %s)`,
+		pluginType,
+		renderStringLiteral(module),
+		renderStringLiteral(name),
+		renderStringLiteral(description),
+		renderPluginUsage(usage),
+		renderStringLiteral(version))
 }
 
 func (writer *Writer) AddState(fieldName string, name string, description string, valueType metadata.Type) {
-	writer.appendLinef(`	builder.AddState("%s", "%s", "%s", %s)`, fieldName, name, description, renderType(valueType))
+	writer.appendLinef(`	builder.AddState(%s, %s, %s, %s)`,
+		renderStringLiteral(fieldName),
+		renderStringLiteral(name),
+		renderStringLiteral(description),
+		renderType(valueType))
 }
 
 func (writer *Writer) AddAction(methodName string, name string, description string, valueType metadata.Type) {
-	writer.appendLinef(`	builder.AddAction("%s", "%s", "%s", %s)`, methodName, name, description, renderType(valueType))
+	writer.appendLinef(`	builder.AddAction(%s, %s, %s, %s)`,
+		renderStringLiteral(methodName),
+		renderStringLiteral(name),
+		renderStringLiteral(description),
+		renderType(valueType))
 
 }
 
 func (writer *Writer) AddConfig(fieldName string, name string, description string, valueType metadata.ConfigType) {
-	writer.appendLinef(`	builder.AddConfig("%s", "%s", "%s", %s)`, fieldName, name, description, renderConfigType(valueType))
+	writer.appendLinef(`	builder.AddConfig(%s, %s, %s, %s)`,
+		renderStringLiteral(fieldName),
+		renderStringLiteral(name),
+		renderStringLiteral(description),
+		renderConfigType(valueType))
 }
 
 func (writer *Writer) EndPlugin() {
@@ -131,6 +149,16 @@ func renderConfigType(configType metadata.ConfigType) string {
 	default:
 		return "???"
 	}
+}
+
+func renderStringLiteral(value string) string {
+	// Consider for now json and golang string same
+	raw, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(raw)
 }
 
 /*
