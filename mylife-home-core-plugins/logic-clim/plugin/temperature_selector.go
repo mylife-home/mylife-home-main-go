@@ -10,7 +10,7 @@ type TemperatureSelector struct {
 	// @Config()
 	Initial int64
 
-	// @State(type="range[17,30]")
+	// @State(type="range[17;30]")
 	Value definitions.State[int64]
 }
 
