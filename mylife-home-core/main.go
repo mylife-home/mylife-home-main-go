@@ -8,6 +8,8 @@ import (
 	_ "mylife-home-core-plugins-logic-base"
 	_ "mylife-home-core-plugins-logic-clim"
 	_ "mylife-home-core-plugins-logic-colors"
+	_ "mylife-home-core-plugins-logic-selectors"
+	_ "mylife-home-core-plugins-logic-timers"
 	_ "mylife-home-core-plugins-ui-base"
 )
 

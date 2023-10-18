@@ -22,6 +22,8 @@ go generate mylife-home-core-plugins/driver-absoluta/main.go
 go generate mylife-home-core-plugins/logic-base/main.go
 go generate mylife-home-core-plugins/logic-clim/main.go
 go generate mylife-home-core-plugins/logic-colors/main.go
+go generate mylife-home-core-plugins/logic-selectors/main.go
+go generate mylife-home-core-plugins/logic-timers/main.go
 go generate mylife-home-core-plugins/ui-base/main.go
 
 ```

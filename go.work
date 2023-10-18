@@ -9,5 +9,7 @@ use (
 	./mylife-home-core-plugins/logic-base
 	./mylife-home-core-plugins/logic-clim
 	./mylife-home-core-plugins/logic-colors
+	./mylife-home-core-plugins/logic-selectors
+	./mylife-home-core-plugins/logic-timers
 	./mylife-home-core-plugins/ui-base
 )
