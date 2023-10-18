@@ -8,5 +8,6 @@ use (
 	./mylife-home-core-plugins/driver-absoluta
 	./mylife-home-core-plugins/logic-base
 	./mylife-home-core-plugins/logic-clim
+	./mylife-home-core-plugins/logic-colors
 	./mylife-home-core-plugins/ui-base
 )
