@@ -21,7 +21,7 @@ func (component *TemperatureToFloat) Terminate() {
 	// Noop
 }
 
-// @Action(type="range[17,30]")
+// @Action(type="range[17;30]")
 func (component *TemperatureToFloat) SetValue(arg int64) {
 	component.Value.Set(float64(arg))
 }
