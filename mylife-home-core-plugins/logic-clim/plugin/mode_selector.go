@@ -36,7 +36,7 @@ func (component *ModeSelector) SetTemperature(arg int64) {
 	component.computeMode()
 }
 
-// @Action(type="range[17;30]")
+// @Action()
 func (component *ModeSelector) SetActive(arg bool) {
 	component.Active.Set(arg)
 	component.computeMode()
