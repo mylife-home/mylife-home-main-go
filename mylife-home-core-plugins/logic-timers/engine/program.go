@@ -94,6 +94,11 @@ func NewProgram[Value any](parseOutputValue func(value string) (Value, error), s
 	return program
 }
 
+func (program *Program[Value]) RunSync() {
+	run := newRun(program)
+	run.execute()
+}
+
 func (program *Program[Value]) Start() {
 	program.mux.Lock()
 	defer program.mux.Unlock()
@@ -147,4 +152,16 @@ func (program *Program[Value]) executeEnd(run *runningData) {
 	if program.running == run {
 		program.running = nil
 	}
+}
+
+func (program *Program[Value]) OnProgress() tools.CallbackRegistration[*ProgressArg] {
+	return program.onProgress
+}
+
+func (program *Program[Value]) OnRunning() tools.CallbackRegistration[bool] {
+	return program.onRunning
+}
+
+func (program *Program[Value]) OnOutput() tools.CallbackRegistration[*OutputArg[Value]] {
+	return program.onOutput
 }
