@@ -12,8 +12,6 @@ type TemperatureToFloat struct {
 }
 
 func (component *TemperatureToFloat) Init() error {
-	component.Value.Set(0)
-
 	return nil
 }
 
