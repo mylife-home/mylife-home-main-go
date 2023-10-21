@@ -5,6 +5,7 @@ COPY . .
 
 RUN go mod download
 RUN go generate mylife-home-core-plugins/driver-absoluta/main.go
+RUN go generate mylife-home-core-plugins/driver-tahoma/main.go
 RUN go generate mylife-home-core-plugins/logic-base/main.go
 RUN go generate mylife-home-core-plugins/logic-clim/main.go
 RUN go generate mylife-home-core-plugins/logic-colors/main.go
