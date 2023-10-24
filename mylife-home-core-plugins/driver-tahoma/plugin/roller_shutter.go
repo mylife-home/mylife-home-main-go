@@ -158,7 +158,13 @@ func (component *RollerShutter) handleExecChanged(arg *engine.ExecChange) {
 }
 
 func (component *RollerShutter) refreshOnline() {
-	online := component.store.Online() && component.store.GetDevice(component.DeviceURL) != nil
+	store := component.store
+	if store == nil {
+		// refreshOnline called in a goroutine, we have exited before
+		return
+	}
+
+	online := store.Online() && store.GetDevice(component.DeviceURL) != nil
 
 	component.Online.Set(online)
 

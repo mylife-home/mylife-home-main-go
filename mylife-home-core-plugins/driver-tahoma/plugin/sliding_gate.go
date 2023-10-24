@@ -83,5 +83,11 @@ func (component *SlidingGate) handleExecChanged(arg *engine.ExecChange) {
 }
 
 func (component *SlidingGate) refreshOnline() {
-	component.Online.Set(component.store.Online() && component.store.GetDevice(component.DeviceURL) != nil)
+	store := component.store
+	if store == nil {
+		// refreshOnline called in a goroutine, we have exited before
+		return
+	}
+
+	component.Online.Set(store.Online() && store.GetDevice(component.DeviceURL) != nil)
 }
