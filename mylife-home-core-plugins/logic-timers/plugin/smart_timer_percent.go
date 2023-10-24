@@ -86,7 +86,7 @@ func (component *SmartTimerPercent) Init() error {
 	}
 
 	component.initProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigInitProgram, false)
-	component.triggerProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigTriggerProgram, false)
+	component.triggerProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigTriggerProgram, true)
 	component.cancelProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigCancelProgram, false)
 
 	component.triggerProgram.OnProgress().Register(component.onProgress)

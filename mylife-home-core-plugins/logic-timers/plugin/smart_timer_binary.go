@@ -85,7 +85,7 @@ func (component *SmartTimerBinary) Init() error {
 	}
 
 	component.initProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigInitProgram, false)
-	component.triggerProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigTriggerProgram, false)
+	component.triggerProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigTriggerProgram, true)
 	component.cancelProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigCancelProgram, false)
 
 	component.triggerProgram.OnProgress().Register(component.onProgress)
