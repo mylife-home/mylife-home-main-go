@@ -5,6 +5,7 @@ import (
 	"mylife-home-core-library/definitions"
 	"mylife-home-core-plugins-driver-tahoma/engine"
 	"reflect"
+	"strconv"
 )
 
 // @Plugin(description="Volet roulant Somfy" usage="actuator")
@@ -115,13 +116,26 @@ func (component *RollerShutter) handleStateChanged(state *engine.DeviceState) {
 		return
 	}
 
-	fvalue, ok := state.Value().(float64)
-	if !ok {
-		logger.Warnf("Could not cast value %+v of type %s to float64 (device='%s', state name='%s')", state.Value(), reflect.TypeOf(state.Value()), state.DeviceURL(), state.Name())
-		return
-	}
+	var value int64
+	switch rawValue := state.Value().(type) {
+	case string:
+		ivalue, err := strconv.Atoi(rawValue)
+		if err != nil {
+			logger.WithError(err).Warnf("Could not cast value %+v of type %s to int64 (device='%s', state name='%s')", state.Value(), reflect.TypeOf(state.Value()), state.DeviceURL(), state.Name())
+			return
+		}
 
-	value := int64(fvalue)
+		value = int64(ivalue)
+
+	case int64:
+		value = rawValue
+
+	case float64:
+		value = int64(rawValue)
+
+	default:
+		logger.Warnf("Could not cast value %+v of type %s to int64 (device='%s', state name='%s')", state.Value(), reflect.TypeOf(state.Value()), state.DeviceURL(), state.Name())
+	}
 
 	if value < 0 {
 		logger.Warnf("Invalid value %d, will use 0 (device='%s', state name='%s')", value, state.DeviceURL(), state.Name())
