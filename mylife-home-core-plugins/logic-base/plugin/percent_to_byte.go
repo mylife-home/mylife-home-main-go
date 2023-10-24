@@ -20,6 +20,6 @@ func (component *PercentToByte) Terminate() {
 }
 
 // @Action(type="range[0;100]")
-func (component *PercentToByte) Set(arg int64) {
+func (component *PercentToByte) SetValue(arg int64) {
 	component.Value.Set(arg * 255 / 100)
 }
