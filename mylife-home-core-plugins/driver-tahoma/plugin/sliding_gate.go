@@ -11,7 +11,7 @@ type SlidingGate struct {
 	// @Config(description="Identifiant de la box Somfy à partir de laquelle se connecter")
 	BoxKey string
 
-	// @Config(description="URL du périphérique Somfy")
+	// @Config(name="deviceURL" description="URL du périphérique Somfy")
 	DeviceURL string
 
 	// @State()
@@ -69,11 +69,11 @@ func (component *SlidingGate) Interrupt(arg bool) {
 }
 
 func (component *SlidingGate) handleOnlineChanged(online bool) {
-	component.refreshOnline()
+	go component.refreshOnline()
 }
 
 func (component *SlidingGate) handleDeviceChanged(arg *engine.DeviceChange) {
-	component.refreshOnline()
+	go component.refreshOnline()
 }
 
 func (component *SlidingGate) handleExecChanged(arg *engine.ExecChange) {

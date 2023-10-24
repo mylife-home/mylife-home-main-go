@@ -13,7 +13,7 @@ type RollerShutter struct {
 	// @Config(description="Identifiant de la box Somfy à partir de laquelle se connecter")
 	BoxKey string
 
-	// @Config(description="URL du périphérique Somfy")
+	// @Config(name="deviceURL" description="URL du périphérique Somfy")
 	DeviceURL string
 
 	// @State()
@@ -98,11 +98,11 @@ func (component *RollerShutter) Interrupt(arg bool) {
 }
 
 func (component *RollerShutter) handleOnlineChanged(online bool) {
-	component.refreshOnline()
+	go component.refreshOnline()
 }
 
 func (component *RollerShutter) handleDeviceChanged(arg *engine.DeviceChange) {
-	component.refreshOnline()
+	go component.refreshOnline()
 }
 
 func (component *RollerShutter) handleStateChanged(state *engine.DeviceState) {
@@ -115,11 +115,13 @@ func (component *RollerShutter) handleStateChanged(state *engine.DeviceState) {
 		return
 	}
 
-	value, ok := state.Value().(int64)
+	fvalue, ok := state.Value().(float64)
 	if !ok {
-		logger.Warnf("Could not cast value %+v of type %s to int (device='%s', state name='%s')", state.Value(), reflect.TypeOf(state.Value()), state.DeviceURL(), state.Name())
+		logger.Warnf("Could not cast value %+v of type %s to float64 (device='%s', state name='%s')", state.Value(), reflect.TypeOf(state.Value()), state.DeviceURL(), state.Name())
 		return
 	}
+
+	value := int64(fvalue)
 
 	if value < 0 {
 		logger.Warnf("Invalid value %d, will use 0 (device='%s', state name='%s')", value, state.DeviceURL(), state.Name())

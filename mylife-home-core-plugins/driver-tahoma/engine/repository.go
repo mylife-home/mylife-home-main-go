@@ -212,10 +212,8 @@ func (store *Store) OnExecChanged() tools.CallbackRegistration[*ExecChange] {
 }
 
 func (store *Store) Online() bool {
-	store.mux.Lock()
-	defer store.mux.Unlock()
-
-	return store.client != nil && store.client.Online()
+	client := store.client
+	return client != nil && client.Online()
 }
 
 func (store *Store) GetDevice(deviceURL string) *Device {
@@ -259,6 +257,7 @@ func (store *Store) handleDeviceList(devices []kizcool.Device) {
 			}
 
 			store.devices[deviceURL] = newDevice
+			logger.Debugf("Device joined '%s", deviceURL)
 			store.onDeviceChanged.Execute(&DeviceChange{
 				device:    newDevice,
 				operation: OperationAdd,
@@ -276,6 +275,7 @@ func (store *Store) handleDeviceList(devices []kizcool.Device) {
 		deviceURL := device.DeviceURL()
 		if _, exists := list[deviceURL]; !exists {
 			delete(store.devices, deviceURL)
+			logger.Debugf("Device left '%s", deviceURL)
 			store.onDeviceChanged.Execute(&DeviceChange{
 				device:    device,
 				operation: OperationRemove,
