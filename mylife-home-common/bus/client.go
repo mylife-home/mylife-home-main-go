@@ -249,9 +249,6 @@ func (client *client) onlineChanged(value bool) {
 }
 
 func (client *client) Online() bool {
-	client.onlineSync.RLock()
-	defer client.onlineSync.RUnlock()
-
 	return client.online
 }
 
@@ -324,7 +321,14 @@ func (client *client) Publish(topic string, payload []byte, retain bool) error {
 
 func (client *client) PublishNoWait(topic string, payload []byte, retain bool) {
 	client.sendQueueAdd(func() error {
-		return client.Publish(topic, payload, retain)
+		err := client.Publish(topic, payload, retain)
+
+		// silent error related to disconnection: everything will be rebuilt on reconnection
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), "not connected") {
+			err = nil
+		}
+
+		return err
 	})
 }
 
@@ -350,7 +354,14 @@ func (client *client) Subscribe(topics ...string) error {
 
 func (client *client) SubscribeNoWait(topics ...string) {
 	client.sendQueueAdd(func() error {
-		return client.Subscribe(topics...)
+		err := client.Subscribe(topics...)
+
+		// silent error related to disconnection: everything will be rebuilt on reconnection
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), "not connected") {
+			err = nil
+		}
+
+		return err
 	})
 }
 
@@ -379,7 +390,17 @@ func (client *client) Unsubscribe(topics ...string) error {
 
 func (client *client) UnsubscribeNoWait(topics ...string) {
 	client.sendQueueAdd(func() error {
-		return client.Unsubscribe(topics...)
+		err := client.Unsubscribe(topics...)
+
+		// silent error related to disconnection: everything will be rebuilt on reconnection
+		if err != nil {
+			msg := strings.ToLower(err.Error())
+			if strings.Contains(msg, "not connected") || strings.Contains(msg, "connection lost") {
+				err = nil
+			}
+		}
+
+		return err
 	})
 }
 
