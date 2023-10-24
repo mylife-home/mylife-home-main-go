@@ -189,7 +189,7 @@ func (client *Client) worker() {
 
 	client.triggerRefresh = func() {
 		// Trigger nearly-immediately
-		refreshTimer.Reset(time.Microsecond)
+		refreshTimer.Reset(time.Millisecond * 100)
 	}
 
 	defer func() {
@@ -223,6 +223,7 @@ func (client *Client) afterReq(err error) {
 }
 
 func (client *Client) refresh() {
+	// logger.Debug("Refresh")
 	err := client.kiz.RefreshStates()
 	client.afterReq(err)
 
@@ -232,6 +233,7 @@ func (client *Client) refresh() {
 }
 
 func (client *Client) poll() {
+	// logger.Debug("Poll")
 	events, err := client.kiz.PollEvents()
 	client.afterReq(err)
 
@@ -246,6 +248,7 @@ func (client *Client) poll() {
 }
 
 func (client *Client) processEvent(event kizcool.Event) {
+	// logger.Debugf("Got event %+v", event)
 	switch event := event.(type) {
 	case *kizcool.ExecutionStateChangedEvent:
 		if event.TimeToNextState == -1 {
@@ -278,6 +281,7 @@ func (client *Client) processEvent(event kizcool.Event) {
 }
 
 func (client *Client) devicesRefresh() {
+	// logger.Debug("DevicesRefresh")
 	devices, err := client.kiz.GetDevices()
 	client.afterReq(err)
 
