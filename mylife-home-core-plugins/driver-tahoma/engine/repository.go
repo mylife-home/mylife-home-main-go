@@ -264,10 +264,7 @@ func (store *Store) handleDeviceList(devices []kizcool.Device) {
 			})
 		}
 
-		store.handleStateRefresh(&StateRefresh{
-			deviceURL: string(device.DeviceURL),
-			states:    device.States,
-		})
+		store.refreshState(string(device.DeviceURL), device.States)
 	}
 
 	// remove
@@ -288,13 +285,17 @@ func (store *Store) handleStateRefresh(arg *StateRefresh) {
 	store.mux.Lock()
 	defer store.mux.Unlock()
 
-	for _, state := range arg.States() {
-		key := store.makeStateKey(arg.DeviceURL(), string(state.Name))
+	store.refreshState(arg.DeviceURL(), arg.States())
+}
+
+func (store *Store) refreshState(deviceURL string, states []kizcool.DeviceState) {
+	for _, state := range states {
+		key := store.makeStateKey(deviceURL, string(state.Name))
 		oldState := store.states[key]
 
 		if oldState == nil || !reflect.DeepEqual(oldState.value, state.Value) {
 			newState := &DeviceState{
-				deviceURL: arg.DeviceURL(),
+				deviceURL: deviceURL,
 				name:      string(state.Name),
 				typ:       state.Type,
 				value:     state.Value,
@@ -304,6 +305,7 @@ func (store *Store) handleStateRefresh(arg *StateRefresh) {
 			store.onStateChanged.Execute(newState)
 		}
 	}
+
 }
 
 func (store *Store) handleExecRefresh(arg *ExecChange) {
