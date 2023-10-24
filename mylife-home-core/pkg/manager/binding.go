@@ -196,7 +196,7 @@ func (b *binding) onSourceStateChange(change *components.StateChange) {
 
 func (b *binding) findMember(plugin *metadata.Plugin, name string, memberType metadata.MemberType) *metadata.Member {
 	member := plugin.Member(name)
-	if member != nil && member.MemberType() != memberType {
+	if member != nil && member.MemberType() == memberType {
 		return member
 	} else {
 		return nil
