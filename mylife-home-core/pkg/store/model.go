@@ -25,9 +25,9 @@ var _ itemConfig = (*ComponentConfig)(nil)
 var _ itemConfig = (*BindingConfig)(nil)
 
 type ComponentConfig struct {
-	Id     string         `json:"id"`
-	Plugin string         `json:"plugin"`
-	Config map[string]any `json:"config"`
+	Id     string                     `json:"id"`
+	Plugin string                     `json:"plugin"`
+	Config map[string]json.RawMessage `json:"config"`
 }
 
 func (config *ComponentConfig) String() string {

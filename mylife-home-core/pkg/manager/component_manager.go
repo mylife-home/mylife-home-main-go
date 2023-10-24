@@ -1,9 +1,11 @@
 package manager
 
 import (
+	"encoding/json"
 	"fmt"
 	"mylife-home-common/bus"
 	"mylife-home-common/components"
+	"mylife-home-common/components/metadata"
 	"mylife-home-common/instance_info"
 	"mylife-home-core/pkg/plugins"
 	"mylife-home-core/pkg/store"
@@ -71,7 +73,12 @@ func makeComponentManager(transport *bus.Transport) (*componentManager, error) {
 			return nil, fmt.Errorf("plugin does not exists: '%s'", config.Plugin)
 		}
 
-		comp, err := pluginInstance.Instantiate(config.Id, config.Config)
+		pluginConfig, err := manager.buildConfig(pluginInstance.Metadata(), config.Config)
+		if err != nil {
+			return nil, fmt.Errorf("could not create plugin config for plugin '%s': %w", pluginInstance.Metadata().Id(), err)
+		}
+
+		comp, err := pluginInstance.Instantiate(config.Id, pluginConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +118,7 @@ func (manager *componentManager) SupportsBindings() bool {
 	return manager.supportsBindings
 }
 
-func (manager *componentManager) AddComponent(id string, plugin string, config map[string]any) error {
+func (manager *componentManager) AddComponent(id string, plugin string, config map[string]json.RawMessage) error {
 	manager.mux.Lock()
 	defer manager.mux.Unlock()
 
@@ -124,7 +131,12 @@ func (manager *componentManager) AddComponent(id string, plugin string, config m
 		return fmt.Errorf("plugin does not exists: '%s'", plugin)
 	}
 
-	comp, err := pluginInstance.Instantiate(id, config)
+	pluginConfig, err := manager.buildConfig(pluginInstance.Metadata(), config)
+	if err != nil {
+		return fmt.Errorf("could not create plugin config for plugin '%s': %w", pluginInstance.Metadata().Id(), err)
+	}
+
+	comp, err := pluginInstance.Instantiate(id, pluginConfig)
 	if err != nil {
 		return err
 	}
@@ -212,4 +224,64 @@ func (manager *componentManager) Save() error {
 
 func (manager *componentManager) buildBindingKey(config *store.BindingConfig) string {
 	return strings.Join([]string{config.SourceComponent, config.SourceState, config.TargetComponent, config.TargetAction}, ":")
+}
+
+// Deserialize properly. go unmarshaller does not differentiate properly int vs float
+func (manager *componentManager) buildConfig(plugin *metadata.Plugin, config map[string]json.RawMessage) (map[string]any, error) {
+	result := make(map[string]any)
+
+	for _, name := range plugin.ConfigNames() {
+		item := plugin.Config(name)
+		raw, ok := config[name]
+		if !ok {
+			return nil, fmt.Errorf("missing config value for item '%s'", name)
+		}
+
+		switch item.ValueType() {
+		case metadata.String:
+			{
+				var value string
+				if err := json.Unmarshal(raw, &value); err != nil {
+					return nil, fmt.Errorf("could not read value '%s' for item '%s': %w", string(raw), name, err)
+				}
+
+				result[name] = value
+			}
+
+		case metadata.Bool:
+			{
+				var value bool
+				if err := json.Unmarshal(raw, &value); err != nil {
+					return nil, fmt.Errorf("could not read value '%s' for item '%s': %w", string(raw), name, err)
+				}
+
+				result[name] = value
+			}
+
+		case metadata.Integer:
+			{
+				var value int64
+				if err := json.Unmarshal(raw, &value); err != nil {
+					return nil, fmt.Errorf("could not read value '%s' for item '%s': %w", string(raw), name, err)
+				}
+
+				result[name] = value
+			}
+
+		case metadata.Float:
+			{
+				var value float64
+				if err := json.Unmarshal(raw, &value); err != nil {
+					return nil, fmt.Errorf("could not read value '%s' for item '%s': %w", string(raw), name, err)
+				}
+
+				result[name] = value
+			}
+
+		default:
+			return nil, fmt.Errorf("unhandled value type '%s' for item '%s'", item.ValueType(), name)
+		}
+	}
+
+	return result, nil
 }
