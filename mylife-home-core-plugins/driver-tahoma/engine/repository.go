@@ -159,7 +159,7 @@ func (store *Store) UnsetClient() {
 	store.client = nil
 }
 
-func (store *Store) Execute(deviceURL string, command string, args ...[]any) {
+func (store *Store) Execute(deviceURL string, command string, args ...any) {
 	store.mux.Lock()
 	defer store.mux.Unlock()
 

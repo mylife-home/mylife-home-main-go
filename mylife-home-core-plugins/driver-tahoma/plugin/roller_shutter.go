@@ -135,7 +135,7 @@ func (component *RollerShutter) handleStateChanged(state *engine.DeviceState) {
 	component.Value.Set(100 - value)
 }
 
-func (component *SlidingGate) handleExecChanged(arg *engine.ExecChange) {
+func (component *RollerShutter) handleExecChanged(arg *engine.ExecChange) {
 	if arg.DeviceURL() == component.DeviceURL {
 		component.Exec.Set(arg.Executing())
 	}

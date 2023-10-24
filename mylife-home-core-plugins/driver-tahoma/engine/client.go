@@ -113,7 +113,7 @@ func (client *Client) onExecChanged(deviceURL kizcool.DeviceURL, executing bool)
 	})
 }
 
-func (client *Client) Execute(device *kizcool.Device, command string, args ...[]any) {
+func (client *Client) Execute(device *kizcool.Device, command string, args ...any) {
 	if !client.connected {
 		logger.Warnf("Client is offline, cannot run command '%s' on device '%s'.", command, device.DeviceURL)
 		return
