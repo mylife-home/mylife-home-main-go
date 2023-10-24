@@ -8,6 +8,8 @@ import (
 
 type RegistrationToken int
 
+const InvalidRegistrationToken RegistrationToken = 0
+
 type CallbackRegistration[TArg any] interface {
 	Register(callback func(TArg)) RegistrationToken
 	Unregister(token RegistrationToken)
