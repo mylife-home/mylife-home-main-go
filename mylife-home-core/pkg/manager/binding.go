@@ -50,7 +50,7 @@ func (b *binding) Terminate() {
 		b.onComponentRemove(target.instanceName, target.component)
 	}
 
-	logger.Infof("Binding '%s' closed")
+	logger.Infof("Binding '%s' closed", b.config)
 }
 
 func (b *binding) Error() bool {
