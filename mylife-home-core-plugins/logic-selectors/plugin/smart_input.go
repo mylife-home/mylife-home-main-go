@@ -51,7 +51,7 @@ func (component *SmartInput) processTrigger(input string, callback func()) {
 	}
 }
 
-func (component *SmartInput) Init() error {
+func (component *SmartInput) Init(runtime definitions.Runtime) error {
 	component.manager = engine.NewInputManager()
 
 	component.processTrigger(component.Triggers0, component.executeOutput0)

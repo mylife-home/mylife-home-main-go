@@ -46,7 +46,7 @@ type Percent struct {
 	loopbackValue int64
 }
 
-func (component *Percent) Init() error {
+func (component *Percent) Init(runtime definitions.Runtime) error {
 	component.ensureBounds(&component.Value0)
 	component.ensureBounds(&component.Value1)
 	component.ensureBounds(&component.Value2)

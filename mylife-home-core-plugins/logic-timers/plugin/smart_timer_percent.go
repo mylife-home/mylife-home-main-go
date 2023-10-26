@@ -67,7 +67,7 @@ type SmartTimerPercent struct {
 	outputs        []definitions.State[int64] // easily address output
 }
 
-func (component *SmartTimerPercent) Init() error {
+func (component *SmartTimerPercent) Init(runtime definitions.Runtime) error {
 	component.TotalTime.Set(0)
 	component.ProgressTime.Set(0)
 	component.Progress.Set(0)

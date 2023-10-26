@@ -15,7 +15,7 @@ func (component *ValueNullablePercent) SetValue(arg int64) {
 	component.Value.Set(arg)
 }
 
-func (component *ValueNullablePercent) Init() error {
+func (component *ValueNullablePercent) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

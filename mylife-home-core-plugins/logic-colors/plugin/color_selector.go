@@ -41,7 +41,7 @@ type ColorSelector struct {
 	Color definitions.State[int64]
 }
 
-func (component *ColorSelector) Init() error {
+func (component *ColorSelector) Init(runtime definitions.Runtime) error {
 	component.ensureBounds(&component.Color0)
 	component.ensureBounds(&component.Color1)
 	component.ensureBounds(&component.Color2)

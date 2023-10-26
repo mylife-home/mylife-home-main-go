@@ -1,6 +1,6 @@
 package definitions
 
 type Plugin interface {
-	Init() error
+	Init(runtime Runtime) error
 	Terminate()
 }

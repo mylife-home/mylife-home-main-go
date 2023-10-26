@@ -13,7 +13,7 @@ type ConstantBool struct {
 	Value definitions.State[bool]
 }
 
-func (component *ConstantBool) Init() error {
+func (component *ConstantBool) Init(runtime definitions.Runtime) error {
 	component.Value.Set(component.ConfigValue)
 
 	return nil

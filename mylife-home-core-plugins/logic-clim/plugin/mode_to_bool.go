@@ -14,7 +14,7 @@ type ModeToBool struct {
 	Value definitions.State[bool]
 }
 
-func (component *ModeToBool) Init() error {
+func (component *ModeToBool) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

@@ -11,7 +11,7 @@ type UiStateMode struct {
 	Value definitions.State[string]
 }
 
-func (component *UiStateMode) Init() error {
+func (component *UiStateMode) Init(runtime definitions.Runtime) error {
 	component.Value.Set("off")
 
 	return nil

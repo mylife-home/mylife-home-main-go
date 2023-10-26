@@ -23,7 +23,7 @@ type ZoneStatus struct {
 	cbhandle engine.StateCallbackHandle
 }
 
-func (component *ZoneStatus) Init() error {
+func (component *ZoneStatus) Init(runtime definitions.Runtime) error {
 	component.Value.Set(false)
 
 	component.state = engine.GetState(component.Key)

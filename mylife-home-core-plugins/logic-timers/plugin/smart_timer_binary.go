@@ -66,7 +66,7 @@ type SmartTimerBinary struct {
 	outputs        []definitions.State[bool] // easily address output
 }
 
-func (component *SmartTimerBinary) Init() error {
+func (component *SmartTimerBinary) Init(runtime definitions.Runtime) error {
 	component.TotalTime.Set(0)
 	component.ProgressTime.Set(0)
 	component.Progress.Set(0)

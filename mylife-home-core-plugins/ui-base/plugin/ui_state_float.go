@@ -11,7 +11,7 @@ type UiStateFloat struct {
 	Value definitions.State[float64]
 }
 
-func (component *UiStateFloat) Init() error {
+func (component *UiStateFloat) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

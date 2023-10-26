@@ -16,7 +16,7 @@ type FloatAverage struct {
 	Value definitions.State[float64]
 }
 
-func (component *FloatAverage) Init() error {
+func (component *FloatAverage) Init(runtime definitions.Runtime) error {
 	component.state = make([]float64, component.UsedCount)
 
 	for index := range component.state {

@@ -20,7 +20,7 @@ type ModeSelector struct {
 	Temperature definitions.State[int64]
 }
 
-func (component *ModeSelector) Init() error {
+func (component *ModeSelector) Init(runtime definitions.Runtime) error {
 	component.Temperature.Set(17)
 	component.computeMode()
 	return nil

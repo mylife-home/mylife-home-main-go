@@ -22,7 +22,7 @@ type Connection struct {
 	service *engine.Service
 }
 
-func (component *Connection) Init() error {
+func (component *Connection) Init(runtime definitions.Runtime) error {
 	component.Connected.Set(false)
 
 	state := engine.GetState(component.Key)

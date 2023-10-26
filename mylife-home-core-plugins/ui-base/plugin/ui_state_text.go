@@ -11,7 +11,7 @@ type UiStateText struct {
 	Value definitions.State[string]
 }
 
-func (component *UiStateText) Init() error {
+func (component *UiStateText) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

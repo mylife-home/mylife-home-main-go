@@ -15,7 +15,7 @@ func (component *ValueBinary) SetValue(arg bool) {
 	component.Value.Set(arg)
 }
 
-func (component *ValueBinary) Init() error {
+func (component *ValueBinary) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

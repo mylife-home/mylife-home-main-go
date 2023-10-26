@@ -13,7 +13,7 @@ type PercentToBinary struct {
 	Value definitions.State[bool]
 }
 
-func (component *PercentToBinary) Init() error {
+func (component *PercentToBinary) Init(runtime definitions.Runtime) error {
 	return nil
 }
 
