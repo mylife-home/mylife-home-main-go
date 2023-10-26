@@ -3,21 +3,30 @@ package plugins
 import (
 	"fmt"
 	"mylife-home-common/components/metadata"
+	"mylife-home-core-library/definitions"
 	"sync"
 )
 
 type untypedState interface {
-	UntypedGet() any
-	SetOnChange(value func(any))
 }
+
+type StateChange struct {
+	ComponentId string
+	StateName   string
+	Value       any
+}
+
+var _ definitions.State[int64] = (*stateImpl[int64])(nil)
+var _ untypedState = (*stateImpl[int64])(nil)
 
 type stateImpl[T comparable] struct {
-	mutex    sync.Mutex
-	value    T
-	onChange func(any)
-}
+	mutex sync.Mutex
+	value T
 
-// State impl
+	componentId string
+	stateName   string
+	channel     chan<- StateChange
+}
 
 func (state *stateImpl[T]) Get() T {
 	state.mutex.Lock()
@@ -32,31 +41,32 @@ func (state *stateImpl[T]) Set(value T) {
 
 	if state.value != value {
 		state.value = value
-		state.onChange(value)
+		state.emit()
 	}
 }
 
-// untypedState impl
-
-func (state *stateImpl[T]) UntypedGet() any {
-	state.mutex.Lock()
-	defer state.mutex.Unlock()
-
-	return state.value
-}
-
-func (state *stateImpl[T]) SetOnChange(value func(any)) {
-	if value == nil {
-		value = func(value any) {}
+func (state *stateImpl[T]) emit() {
+	state.channel <- StateChange{
+		ComponentId: state.componentId,
+		StateName:   state.stateName,
+		Value:       state.value,
 	}
-
-	state.onChange = value
 }
 
-// ---
+func (state *stateImpl[T]) init(componentId string, stateName string, channel chan<- StateChange) {
+	state.componentId = componentId
+	state.stateName = stateName
+	state.channel = channel
+	state.emit()
+}
 
-func makeStateImpl(typ metadata.Type) untypedState {
-	var state untypedState
+type privateState interface {
+	untypedState
+	init(componentId string, stateName string, channel chan<- StateChange)
+}
+
+func makeStateImpl(componentId string, stateName string, typ metadata.Type, channel chan<- StateChange) untypedState {
+	var state privateState
 	switch typ.(type) {
 	case *metadata.RangeType:
 		state = &stateImpl[int64]{}
@@ -74,8 +84,7 @@ func makeStateImpl(typ metadata.Type) untypedState {
 		panic(fmt.Sprintf("Unexpected type '%s'", typ.String()))
 	}
 
-	// setup noop
-	state.SetOnChange(nil)
+	state.init(componentId, stateName, channel)
 
 	return state
 }
