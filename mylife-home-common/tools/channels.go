@@ -40,7 +40,7 @@ func (m *ChannelMerger[T]) Create() chan<- T {
 	return ch
 }
 
-func (m *ChannelMerger[T]) Out() chan<- T {
+func (m *ChannelMerger[T]) Out() <-chan T {
 	return m.out
 }
 
@@ -94,6 +94,14 @@ func MapChannel[TIn any, TOut any](in <-chan TIn, out chan<- TOut, mapper func(i
 	go func() {
 		for vin := range in {
 			out <- mapper(vin)
+		}
+	}()
+}
+
+func PipeChannel[T any](in <-chan T, out chan<- T) {
+	go func() {
+		for vin := range in {
+			out <- vin
 		}
 	}()
 }
