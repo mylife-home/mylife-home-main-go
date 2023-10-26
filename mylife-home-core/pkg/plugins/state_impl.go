@@ -57,6 +57,8 @@ func (state *stateImpl[T]) init(componentId string, stateName string, channel ch
 	state.componentId = componentId
 	state.stateName = stateName
 	state.channel = channel
+
+	// emit initial state
 	state.emit()
 }
 

@@ -1,45 +1,44 @@
 package plugins
 
 import (
+	"context"
 	"mylife-home-common/components"
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/tools"
 	"mylife-home-core-library/definitions"
+	"sync"
 )
 
 var _ components.Component = (*Component)(nil)
 
 type Component struct {
+	// metadata/direct component management
 	id            string
 	plugin        *Plugin
 	target        definitions.Plugin
-	state         map[string]untypedState
-	actions       map[string]func(any)
-	onStateChange *tools.CallbackManager[*components.StateChange]
+	actions       map[string]func(any)                            // direct on component
+	state         map[string]any                                  // state on main loop
+	onStateChange *tools.CallbackManager[*components.StateChange] // on main loop
+
+	// component loop management
+	wg             sync.WaitGroup
+	closeCtxCancel func()
+	closeCtx       context.Context
+	mainLoopChan   *tools.ChannelMerger[func()]
+	actionExecutor definitions.Executor
 }
 
-func newComponent(id string, plugin *Plugin, target definitions.Plugin, state map[string]untypedState, actions map[string]func(any)) *Component {
+func newComponent(id string, plugin *Plugin, target definitions.Plugin, actions map[string]func(any)) *Component {
 	comp := &Component{
 		id:            id,
 		plugin:        plugin,
 		target:        target,
-		state:         state,
 		actions:       actions,
+		state:         make(map[string]any),
 		onStateChange: tools.NewCallbackManager[*components.StateChange](),
 	}
 
-	for name, stateItem := range comp.state {
-		name := name // fix for/closure issue
-		stateItem.SetOnChange(func(value any) {
-			comp.onStateChange.Execute(components.NewStateChange(name, value))
-		})
-	}
-
 	return comp
-}
-
-func (comp *Component) OnStateChange() tools.CallbackRegistration[*components.StateChange] {
-	return comp.onStateChange
 }
 
 func (comp *Component) Id() string {
@@ -50,25 +49,98 @@ func (comp *Component) Plugin() *metadata.Plugin {
 	return comp.plugin.Metadata()
 }
 
+func (comp *Component) OnStateChange() tools.CallbackRegistration[*components.StateChange] {
+	return comp.onStateChange
+}
+
 func (comp *Component) GetStateItem(name string) any {
-	return comp.state[name].UntypedGet()
+	return comp.state[name]
 }
 
 func (comp *Component) GetState() tools.ReadonlyMap[string, any] {
-	state := make(map[string]any)
-
-	for name, stateItem := range comp.state {
-		state[name] = stateItem.UntypedGet()
-	}
-
-	return tools.NewReadonlyMap(state)
+	return tools.NewReadonlyMap(comp.state)
 }
 
-func (comp *Component) ExecuteAction(name string, value any) {
-	action := comp.actions[name]
-	action(value)
+func (comp *Component) ExecuteAction(actionName string, arg any) {
+	action := comp.actions[actionName]
+
+	comp.actionExecutor.Execute(func() {
+		action(arg)
+	})
+}
+
+// Connect state change channel to the component (on main loop)
+func (comp *Component) DispatchStateChange(stateName string, value any) {
+	comp.state[stateName] = value
+	comp.onStateChange.Execute(components.NewStateChange(stateName, value))
+}
+
+func (comp *Component) Init() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	comp.closeCtxCancel = cancel
+	comp.closeCtx = ctx
+
+	comp.startLoop()
+	return comp.runTargetInit()
 }
 
 func (comp *Component) Terminate() {
-	comp.target.Terminate()
+	comp.closeCtxCancel()
+	comp.runTargetTerminate()
+	comp.stopLoop()
+}
+
+func (comp *Component) runTargetInit() error {
+
+	rt := makeRuntime(comp.id, comp.closeCtx, comp.mainLoopChan)
+	retc := make(chan error)
+
+	comp.actionExecutor.Execute(func() {
+		retc <- comp.target.Init(rt)
+		close(retc)
+	})
+
+	// wait init response and return
+	return <-retc
+
+}
+
+func (comp *Component) runTargetTerminate() {
+
+	retc := make(chan struct{})
+
+	comp.actionExecutor.Execute(func() {
+		comp.target.Terminate()
+		close(retc)
+	})
+
+	// wait response and return
+	<-retc
+}
+
+func (comp *Component) startLoop() {
+	// since actionExecutor is the initial channel, we cannot build it the usual way
+	actionChan := make(chan func())
+	comp.actionExecutor = &executorImpl{channel: actionChan}
+	comp.mainLoopChan = tools.MakeChannelMerger[func()](actionChan)
+
+	comp.wg.Add(1)
+	go comp.loop()
+}
+
+func (comp *Component) stopLoop() {
+	comp.actionExecutor.Terminate()
+	// Note: all other executors have to terminate to make it exit
+	comp.wg.Wait() // wait pluginLoop to exit
+}
+
+func (comp *Component) loop() {
+	defer comp.wg.Done()
+
+	bufferedIn, bufferedOut := tools.BufferedChannel[func()]()
+	tools.PipeChannel(comp.mainLoopChan.Out(), bufferedOut)
+
+	for callback := range bufferedIn {
+		callback()
+	}
 }
