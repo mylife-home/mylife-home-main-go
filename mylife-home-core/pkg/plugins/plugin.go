@@ -89,6 +89,7 @@ func (plugin *Plugin) Instantiate(id string, config map[string]any, stateChangeC
 
 	// Initialize the component
 	if err := comp.Init(); err != nil {
+		comp.Terminate() // need to do this to exit the component loop actually
 		return nil, err
 	}
 
