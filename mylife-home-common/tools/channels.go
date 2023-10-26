@@ -34,7 +34,7 @@ func (m *ChannelMerger[T]) Add(ch <-chan T) {
 	}()
 }
 
-func (m *ChannelMerger[T]) Create() <-chan T {
+func (m *ChannelMerger[T]) Create() chan<- T {
 	ch := make(chan T)
 	m.Add(ch)
 	return ch
@@ -88,4 +88,12 @@ func BufferedChannel[T any]() (<-chan T, chan<- T) {
 	}()
 
 	return in, out
+}
+
+func MapChannel[TIn any, TOut any](in <-chan TIn, out chan<- TOut, mapper func(in TIn) TOut) {
+	go func() {
+		for vin := range in {
+			out <- mapper(vin)
+		}
+	}()
 }
