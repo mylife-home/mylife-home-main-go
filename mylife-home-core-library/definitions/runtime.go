@@ -24,7 +24,14 @@ type Executor interface {
 }
 
 /*
-Example SetTimout/SetInterval implementation
+Example implementations
+
+	// Note: could also keep one executor open and run each 'SetImmediate' as Execute on it
+	func SetImmediate(runtime Runtime, callback func()) {
+		e := runtime.NewExecutor()
+		e.Execute(callback)
+		e.Terminate()
+	}
 
 	func SetTimeout(runtime Runtime, duration time.Duration, callback func()) {
 		e := runtime.NewExecutor()
