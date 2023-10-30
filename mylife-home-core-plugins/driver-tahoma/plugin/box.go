@@ -25,7 +25,7 @@ type Box struct {
 	storeOnlineChangedToken tools.RegistrationToken
 }
 
-func (component *Box) Init() error {
+func (component *Box) Init(runtime definitions.Runtime) error {
 	component.store = engine.GetStore(component.BoxKey)
 	component.storeOnlineChangedToken = component.store.OnOnlineChanged().Register(component.handleOnlineChanged)
 

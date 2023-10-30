@@ -7,7 +7,6 @@ import (
 	"mylife-home-common/log/publish"
 	"mylife-home-common/tools"
 	"os"
-	"sync"
 	"time"
 )
 
@@ -50,6 +49,8 @@ func (logger *Logger) logSender(ctx context.Context) {
 		case e := <-logger.queue:
 			logger.send(e)
 		case <-ctx.Done():
+			return
+		case <-logger.client.ctx.Done():
 			return
 		}
 	}
@@ -101,11 +102,13 @@ func (logger *Logger) send(e *publish.LogEntry) {
 	if err != nil {
 		// Note: should log it, but it would cause more entries
 		fmt.Printf("Error marshaling log: '%f'\n", err)
+		return
 	}
 
-	err = logger.client.Publish(logger.client.BuildTopic(loggerDomain), raw, false)
-	if err != nil {
-		// Note: should log it, but it would cause more entries
+	// Do not use classical queue, send logs sequentialy
+	token := logger.client.mqtt.Publish(logger.client.BuildTopic(loggerDomain), 0, false, raw)
+	token.Wait()
+	if err := token.Error(); err != nil {
 		fmt.Printf("Error sending log: '%f'\n", err)
 	}
 }
@@ -132,43 +135,4 @@ func convertLevel(level publish.LogLevel) int {
 	}
 
 	panic(fmt.Errorf("unknown level %s", level))
-}
-
-type offlineQueue struct {
-	buffer     []*publish.LogEntry
-	bufferSync sync.Mutex
-}
-
-func newOfflineQueue() *offlineQueue {
-	return &offlineQueue{
-		buffer: make([]*publish.LogEntry, 0),
-	}
-}
-
-func (queue *offlineQueue) Enqueue(e *publish.LogEntry) {
-	fmt.Printf("Enqueue\n")
-	queue.bufferSync.Lock()
-	defer queue.bufferSync.Unlock()
-
-	if len(queue.buffer) >= offlineRetention {
-		// Note: should log it, but it would cause more entries to arrive
-		fmt.Println("Log entry dropped because offline queue is full")
-		return
-	}
-
-	queue.buffer = append(queue.buffer, e)
-}
-
-func (queue *offlineQueue) Dequeue() *publish.LogEntry {
-	fmt.Printf("Dequeue\n")
-	queue.bufferSync.Lock()
-	defer queue.bufferSync.Unlock()
-
-	if len(queue.buffer) == 0 {
-		return nil
-	}
-
-	e := queue.buffer[0]
-	queue.buffer = queue.buffer[1:]
-	return e
 }

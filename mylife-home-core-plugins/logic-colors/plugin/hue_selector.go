@@ -44,7 +44,7 @@ type HueSelector struct {
 	White definitions.State[bool]
 }
 
-func (component *HueSelector) Init() error {
+func (component *HueSelector) Init(runtime definitions.Runtime) error {
 	component.ensureBounds(&component.Hue0)
 	component.ensureBounds(&component.Hue1)
 	component.ensureBounds(&component.Hue2)

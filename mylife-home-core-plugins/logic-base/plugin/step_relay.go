@@ -11,7 +11,7 @@ type StepRelay struct {
 	Value definitions.State[bool]
 }
 
-func (component *StepRelay) Init() error {
+func (component *StepRelay) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

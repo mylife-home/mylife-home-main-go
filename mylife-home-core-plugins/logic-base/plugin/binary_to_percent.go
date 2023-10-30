@@ -16,7 +16,7 @@ type BinaryToPercent struct {
 	Value definitions.State[int64]
 }
 
-func (component *BinaryToPercent) Init() error {
+func (component *BinaryToPercent) Init(runtime definitions.Runtime) error {
 	if component.Low < 0 {
 		component.Low = 0
 	}

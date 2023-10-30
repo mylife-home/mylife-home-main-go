@@ -22,7 +22,7 @@ type Store struct {
 	operations storeOperations
 	components map[string]*ComponentConfig
 	bindings   map[string]*BindingConfig
-	mux        sync.Mutex
+	mux        sync.Mutex // Need to sync because Save() is executed in its own goroutine
 }
 
 func MakeStore() (*Store, error) {

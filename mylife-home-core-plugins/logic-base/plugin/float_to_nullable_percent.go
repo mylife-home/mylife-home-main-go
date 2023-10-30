@@ -17,7 +17,7 @@ type FloatToNullablePercent struct {
 	Value definitions.State[int64]
 }
 
-func (component *FloatToNullablePercent) Init() error {
+func (component *FloatToNullablePercent) Init(runtime definitions.Runtime) error {
 	component.Value.Set(-1)
 
 	return nil

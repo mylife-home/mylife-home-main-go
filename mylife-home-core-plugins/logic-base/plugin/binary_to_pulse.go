@@ -14,7 +14,7 @@ type BinaryToPulse struct {
 	On definitions.State[bool]
 }
 
-func (component *BinaryToPulse) Init() error {
+func (component *BinaryToPulse) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

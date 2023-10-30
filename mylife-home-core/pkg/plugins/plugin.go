@@ -64,12 +64,7 @@ func (plugin *Plugin) Instantiate(id string, config map[string]any) (*Component,
 	compPtr := reflect.New(plugin.target)
 
 	// Prepare it
-	state := make(map[string]untypedState)
 	actions := make(map[string]func(any))
-
-	for name, stateItem := range plugin.state {
-		state[name] = stateItem.init(compPtr)
-	}
 
 	for name, action := range plugin.actions {
 		actions[name] = action.init(compPtr)
@@ -83,15 +78,20 @@ func (plugin *Plugin) Instantiate(id string, config map[string]any) (*Component,
 
 	target := compPtr.Interface().(definitions.Plugin)
 
-	// Initialize the component
-	if err := target.Init(); err != nil {
-		return nil, err
-	}
+	comp := newComponent(id, plugin, target, actions)
 
-	comp := newComponent(id, plugin, target, state, actions)
+	for _, stateItem := range plugin.state {
+		stateItem.init(compPtr, comp)
+	}
 
 	logger.Infof("Component created: '%s'", comp.id)
 	logger.Debugf("Configuration applied (component='%s'): %+v", comp.id, config)
+
+	// Initialize the component
+	if err := comp.Init(); err != nil {
+		comp.Terminate() // need to do this to exit the component loop actually
+		return nil, err
+	}
 
 	return comp, nil
 }
@@ -123,13 +123,17 @@ func makeStateItem(stateType *registry.StateType) *pluginStateItem {
 	}
 }
 
-func (s *pluginStateItem) init(compPtr reflect.Value) untypedState {
-	impl := makeStateImpl(s.meta.ValueType())
+func (s *pluginStateItem) init(compPtr reflect.Value, comp *Component) {
+	onEmit := func(value any) {
+		comp.stateChanged(s.meta.Name(), value)
+	}
 
-	comp := compPtr.Elem()
-	comp.FieldByName(s.target.Name).Set(reflect.ValueOf(impl))
+	var initialValue any
+	impl := makeStateImpl(s.meta.ValueType(), onEmit, &initialValue)
+	comp.state[s.meta.Name()] = initialValue
 
-	return impl
+	target := compPtr.Elem()
+	target.FieldByName(s.target.Name).Set(reflect.ValueOf(impl))
 }
 
 type pluginAction struct {

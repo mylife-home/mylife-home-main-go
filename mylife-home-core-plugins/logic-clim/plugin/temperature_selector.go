@@ -14,7 +14,7 @@ type TemperatureSelector struct {
 	Value definitions.State[int64]
 }
 
-func (component *TemperatureSelector) Init() error {
+func (component *TemperatureSelector) Init(runtime definitions.Runtime) error {
 	component.Value.Set(component.Initial)
 
 	return nil

@@ -11,7 +11,7 @@ type UiButton struct {
 	Value definitions.State[bool]
 }
 
-func (component *UiButton) Init() error {
+func (component *UiButton) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

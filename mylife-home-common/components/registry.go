@@ -6,7 +6,6 @@ import (
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/log"
 	"mylife-home-common/tools"
-	"sync"
 )
 
 var logger = log.CreateLogger("mylife:home:components:registry")
@@ -90,7 +89,6 @@ func (data *ComponentData) Component() Component {
 type Registry struct {
 	onComponentChange  *tools.CallbackManager[*ComponentChange]
 	onPluginChange     *tools.CallbackManager[*PluginChange]
-	lock               sync.RWMutex
 	components         map[string]*ComponentData
 	pluginsPerInstance map[string]*metadata.Plugin
 	instances          map[string]*instanceData
@@ -132,9 +130,6 @@ func (reg *Registry) OnPluginChange() tools.CallbackRegistration[*PluginChange] 
 }
 
 func (reg *Registry) AddPlugin(instanceName string, plugin *metadata.Plugin) {
-	reg.lock.Lock()
-	defer reg.lock.Unlock()
-
 	key := reg.buildPluginId(instanceName, plugin)
 	if _, exists := reg.pluginsPerInstance[key]; exists {
 		panic(fmt.Errorf("plugin '%s' does already exist in the registry", key))
@@ -155,9 +150,6 @@ func (reg *Registry) AddPlugin(instanceName string, plugin *metadata.Plugin) {
 }
 
 func (reg *Registry) RemovePlugin(instanceName string, plugin *metadata.Plugin) {
-	reg.lock.Lock()
-	defer reg.lock.Unlock()
-
 	key := reg.buildPluginId(instanceName, plugin)
 	if _, exists := reg.pluginsPerInstance[key]; !exists {
 		panic(fmt.Errorf("plugin '%s' does not exist in the registry", key))
@@ -208,9 +200,6 @@ func (reg *Registry) HasPlugin(instanceName string, id string) bool {
 }
 
 func (reg *Registry) GetPlugin(instanceName string, id string) *metadata.Plugin {
-	reg.lock.RLock()
-	defer reg.lock.RUnlock()
-
 	if instanceName == "" {
 		instanceName = "local"
 	}
@@ -220,9 +209,6 @@ func (reg *Registry) GetPlugin(instanceName string, id string) *metadata.Plugin 
 }
 
 func (reg *Registry) GetPlugins(instanceName string) tools.ReadonlySlice[*metadata.Plugin] {
-	reg.lock.RLock()
-	defer reg.lock.RUnlock()
-
 	data := reg.instances[instanceName]
 	plugins := make([]*metadata.Plugin, 0)
 	if data != nil {
@@ -235,9 +221,6 @@ func (reg *Registry) GetPlugins(instanceName string) tools.ReadonlySlice[*metada
 }
 
 func (reg *Registry) AddComponent(instanceName string, component Component) {
-	reg.lock.Lock()
-	defer reg.lock.Unlock()
-
 	id := component.Id()
 	if _, exists := reg.components[id]; exists {
 		panic(fmt.Errorf("Component '%s' does already exist in the registry", id))
@@ -261,9 +244,6 @@ func (reg *Registry) AddComponent(instanceName string, component Component) {
 }
 
 func (reg *Registry) RemoveComponent(instanceName string, component Component) {
-	reg.lock.Lock()
-	defer reg.lock.Unlock()
-
 	id := component.Id()
 	if _, exists := reg.components[id]; !exists {
 		panic(fmt.Errorf("Component '%s' does not exist in the registry", id))
@@ -296,16 +276,10 @@ func (reg *Registry) GetComponent(id string) Component {
 }
 
 func (reg *Registry) GetComponentData(id string) *ComponentData {
-	reg.lock.RLock()
-	defer reg.lock.RUnlock()
-
 	return reg.components[id]
 }
 
 func (reg *Registry) GetComponentsData() tools.ReadonlySlice[*ComponentData] {
-	reg.lock.RLock()
-	defer reg.lock.RUnlock()
-
 	components := make([]*ComponentData, 0, len(reg.components))
 
 	for _, data := range reg.components {
@@ -316,9 +290,6 @@ func (reg *Registry) GetComponentsData() tools.ReadonlySlice[*ComponentData] {
 }
 
 func (reg *Registry) GetComponents() tools.ReadonlySlice[Component] {
-	reg.lock.RLock()
-	defer reg.lock.RUnlock()
-
 	components := make([]Component, 0, len(reg.components))
 
 	for _, data := range reg.components {
@@ -329,9 +300,6 @@ func (reg *Registry) GetComponents() tools.ReadonlySlice[Component] {
 }
 
 func (reg *Registry) GetInstanceNames() tools.ReadonlySlice[string] {
-	reg.lock.RLock()
-	defer reg.lock.RUnlock()
-
 	instances := make([]string, 0, len(reg.instances))
 
 	for instanceName := range reg.instances {

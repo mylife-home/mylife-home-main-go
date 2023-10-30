@@ -119,7 +119,7 @@ func (disp *dispatcher) AddSubscription(member string, handler func([]byte)) {
 
 	disp.subscriptions[member] = handler
 
-	disp.client.SubscribeNoWait(disp.buildTopic(member))
+	disp.client.Subscribe(disp.buildTopic(member))
 }
 
 func (disp *dispatcher) Terminate() {
@@ -132,14 +132,14 @@ func (disp *dispatcher) Terminate() {
 			topics = append(topics, disp.buildTopic(member))
 		}
 
-		disp.client.UnsubscribeNoWait(topics...)
+		disp.client.Unsubscribe(topics...)
 	}
 }
 
 func (disp *dispatcher) Emit(memberName string, value []byte, persistent bool) {
 	topic := disp.buildTopic(memberName)
 
-	disp.client.PublishNoWait(topic, value, persistent)
+	disp.client.Publish(topic, value, persistent)
 }
 
 func (disp *dispatcher) buildTopic(member string) string {

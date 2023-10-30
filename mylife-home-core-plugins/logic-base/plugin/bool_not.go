@@ -11,7 +11,7 @@ type BoolNot struct {
 	Value definitions.State[bool]
 }
 
-func (component *BoolNot) Init() error {
+func (component *BoolNot) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

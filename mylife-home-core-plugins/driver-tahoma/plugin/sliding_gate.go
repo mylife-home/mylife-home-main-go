@@ -26,7 +26,7 @@ type SlidingGate struct {
 	storeExecChangedToken   tools.RegistrationToken
 }
 
-func (component *SlidingGate) Init() error {
+func (component *SlidingGate) Init(runtime definitions.Runtime) error {
 	component.store = engine.GetStore(component.BoxKey)
 
 	component.storeOnlineChangedToken = component.store.OnOnlineChanged().Register(component.handleOnlineChanged)

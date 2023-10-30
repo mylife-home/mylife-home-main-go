@@ -28,7 +28,7 @@ type ValuePercent struct {
 	Value definitions.State[int64]
 }
 
-func (component *ValuePercent) Init() error {
+func (component *ValuePercent) Init(runtime definitions.Runtime) error {
 	component.ToggleThreshold.Set(component.ConfigToggleThreshold)
 	component.OnValue.Set(component.ConfigOnValue)
 	component.OffValue.Set(component.ConfigOffValue)

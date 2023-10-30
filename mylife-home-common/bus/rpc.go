@@ -3,6 +3,7 @@ package bus
 import (
 	"fmt"
 	"math/rand"
+	"mylife-home-common/executor"
 	"mylife-home-common/tools"
 	"time"
 )
@@ -26,37 +27,35 @@ func newRpc(client *client) *Rpc {
 }
 
 type RpcService interface {
-	init(client *client, address string) error
-	terminate() error
+	init(client *client, address string)
+	terminate()
 }
 
-func (rpc *Rpc) Serve(address string, svc RpcService) error {
+func (rpc *Rpc) Serve(address string, svc RpcService) {
 	_, exists := rpc.services[address]
 	if exists {
 		panic(fmt.Errorf("service with address '%s' does already exist", address))
 	}
 
-	if err := svc.init(rpc.client, address); err != nil {
-		return err
-	}
+	svc.init(rpc.client, address)
 
 	rpc.services[address] = svc
-	return nil
 }
 
-func (rpc *Rpc) Unserve(address string) error {
+func (rpc *Rpc) Unserve(address string) {
 	svc, exists := rpc.services[address]
 	if !exists {
 		panic(fmt.Errorf("service with address '%s' does not exist", address))
 	}
 
-	err := svc.terminate()
+	svc.terminate()
 	delete(rpc.services, address)
-	return err
 }
 
 // Cannot use member function because of generic
-func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address string, data TInput, timeout time.Duration) (TOutput, error) {
+// TODO: need reviews
+/*
+func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address string, data TInput, timeout time.Duration, callback func(TOutput, error)) {
 	replyId := randomTopicPart()
 	replyTopic := rpc.client.BuildTopic(rpcDomain, rpcReplies, replyId)
 	remoteTopic := rpc.client.BuildRemoteTopic(targetInstance, rpcDomain, rpcServices, address)
@@ -107,32 +106,43 @@ func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address s
 
 	return *resp.Output, nil
 }
+*/
 
 type rpcServiceImpl[TInput any, TOutput any] struct {
 	client         *client
 	address        string
+	sync           bool
 	implementation func(TInput) (TOutput, error)
 	msgToken       tools.RegistrationToken
 }
 
-func NewRpcService[TInput any, TOutput any](implementation func(TInput) (TOutput, error)) RpcService {
+// Note: Implementation is executed in its own goroutine.
+func NewRpcServiceAsync[TInput any, TOutput any](implementation func(TInput) (TOutput, error)) RpcService {
 	return &rpcServiceImpl[TInput, TOutput]{
 		implementation: implementation,
+		sync:           false,
 	}
 }
 
-func (svc *rpcServiceImpl[TInput, TOutput]) init(client *client, address string) error {
+// Note: Implementation is executed in MainLoop goroutine
+func NewRpcServiceSync[TInput any, TOutput any](implementation func(TInput) (TOutput, error)) RpcService {
+	return &rpcServiceImpl[TInput, TOutput]{
+		implementation: implementation,
+		sync:           true,
+	}
+}
+
+func (svc *rpcServiceImpl[TInput, TOutput]) init(client *client, address string) {
 	svc.client = client
 	svc.address = address
 
 	svc.msgToken = svc.client.OnMessage().Register(svc.onMessage)
-	return svc.client.Subscribe(svc.buildTopic())
+	svc.client.Subscribe(svc.buildTopic())
 }
 
-func (svc *rpcServiceImpl[TInput, TOutput]) terminate() error {
-	err := svc.client.Unsubscribe(svc.buildTopic())
+func (svc *rpcServiceImpl[TInput, TOutput]) terminate() {
+	svc.client.Unsubscribe(svc.buildTopic())
 	svc.client.OnMessage().Unregister(svc.msgToken)
-	return err
 }
 
 func (svc *rpcServiceImpl[TInput, TOutput]) onMessage(m *message) {
@@ -140,12 +150,39 @@ func (svc *rpcServiceImpl[TInput, TOutput]) onMessage(m *message) {
 		return
 	}
 
+	if svc.sync {
+		svc.runSync(m.Payload())
+	} else {
+		svc.runAsync(m.Payload())
+	}
+}
+
+func (svc *rpcServiceImpl[TInput, TOutput]) runSync(payload []byte) {
+	var req request[TInput]
+	Encoding.ReadTypedJson(payload, &req)
+
+	resp := svc.handle(&req)
+
+	output := Encoding.WriteJson(resp)
+	svc.client.Publish(req.ReplyTopic, output, false)
+}
+
+func (svc *rpcServiceImpl[TInput, TOutput]) runAsync(payload []byte) {
+	var req request[TInput]
+	Encoding.ReadTypedJson(payload, &req)
+
+	// Need to create a dedicated executor in case we got shutdown while executing handler
+	exec := executor.CreateExecutor()
+
 	go func() {
-		var req request[TInput]
-		Encoding.ReadTypedJson(m.Payload(), &req)
+		defer exec.Terminate()
+
 		resp := svc.handle(&req)
-		output := Encoding.WriteJson(resp)
-		svc.client.PublishNoWait(req.ReplyTopic, output, false)
+
+		exec.Execute(func() {
+			output := Encoding.WriteJson(resp)
+			svc.client.Publish(req.ReplyTopic, output, false)
+		})
 	}()
 }
 

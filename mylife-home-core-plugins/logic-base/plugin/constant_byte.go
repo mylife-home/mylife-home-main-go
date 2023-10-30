@@ -13,7 +13,7 @@ type ConstantByte struct {
 	Value definitions.State[int64]
 }
 
-func (component *ConstantByte) Init() error {
+func (component *ConstantByte) Init(runtime definitions.Runtime) error {
 	value := component.ConfigValue
 	if value < 0 {
 		value = 0
