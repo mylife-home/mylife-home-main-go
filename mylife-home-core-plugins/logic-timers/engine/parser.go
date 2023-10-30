@@ -2,12 +2,11 @@ package engine
 
 import (
 	"fmt"
-	"mylife-home-common/tools"
 	"strings"
 )
 
 type ProgramParser[Value any] struct {
-	onOutput         *tools.CallbackManager[*OutputArg[Value]]
+	setOutput        func(index int, value Value)
 	parseOutputValue func(value string) (Value, error)
 	source           string
 	canWait          bool
@@ -47,7 +46,7 @@ func (parser *ProgramParser[Value]) createStep(op string, arg string) (step, err
 				return nil, err
 			}
 
-			step := newSetOutputStep[Value](parser.onOutput, index, value)
+			step := newSetOutputStep[Value](parser.setOutput, index, value)
 			return step, nil
 		}
 	}
@@ -58,7 +57,7 @@ func (parser *ProgramParser[Value]) createStep(op string, arg string) (step, err
 			return nil, err
 		}
 
-		step := newSetAllOutputsStep[Value](parser.onOutput, value)
+		step := newSetAllOutputsStep[Value](parser.setOutput, value)
 		return step, nil
 	}
 

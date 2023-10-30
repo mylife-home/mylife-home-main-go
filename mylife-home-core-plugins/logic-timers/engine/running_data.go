@@ -2,39 +2,36 @@ package engine
 
 import (
 	"context"
-	"mylife-home-common/tools"
 	"time"
 )
 
 type runningData struct {
 	// definition
-	steps      []step
-	startTime  time.Time
-	totalTime  time.Duration
-	onProgress *tools.CallbackManager[*ProgressArg]
-	onRunning  *tools.CallbackManager[bool]
+	steps          []step
+	startTime      time.Time
+	totalTime      time.Duration
+	updateProgress func(time.Duration)
+	setRunning     func(bool)
 
 	// runtime
 	ctx       context.Context
 	interrupt func()
-	started   chan struct{}
 	exited    chan struct{}
-	onEnd     func() // not interrupted
+	onEnd     func() // when not interrupted
 }
 
 func newRun[Value any](program *Program[Value]) *runningData {
 	ctx, interrupt := context.WithCancel(context.Background())
 
 	run := &runningData{
-		steps:      program.steps,
-		startTime:  time.Now(),
-		totalTime:  program.totalTime,
-		onProgress: program.onProgress,
-		onRunning:  program.onRunning,
-		ctx:        ctx,
-		interrupt:  interrupt,
-		started:    make(chan struct{}),
-		exited:     make(chan struct{}),
+		steps:          program.steps,
+		startTime:      time.Now(),
+		totalTime:      program.totalTime,
+		updateProgress: program.updateProgress,
+		setRunning:     program.setRunning,
+		ctx:            ctx,
+		interrupt:      interrupt,
+		exited:         make(chan struct{}),
 	}
 
 	run.onEnd = func() {
@@ -44,7 +41,16 @@ func newRun[Value any](program *Program[Value]) *runningData {
 	return run
 }
 
-func (run *runningData) execute() {
+func (run *runningData) Start() {
+	go run.Execute()
+}
+
+func (run *runningData) Stop() {
+	run.interrupt()
+	<-run.exited
+}
+
+func (run *runningData) Execute() {
 	ended := run.executeSteps()
 
 	if ended {
@@ -54,12 +60,11 @@ func (run *runningData) execute() {
 }
 
 func (run *runningData) executeSteps() bool {
-	close(run.started)
 	defer close(run.exited)
 
-	run.onRunning.Execute(true)
-	defer run.onRunning.Execute(false)
-	defer run.onProgress.Execute(&ProgressArg{percent: 0, progressTime: 0})
+	run.setRunning(true)
+	defer run.setRunning(false)
+	defer run.updateProgress(0)
 
 	for _, step := range run.steps {
 		step.Execute(run)
@@ -78,6 +83,5 @@ func (run *runningData) computeProgress() {
 	}
 
 	progressTime := time.Since(run.startTime)
-	percent := float64(progressTime.Milliseconds()) / float64(run.totalTime.Milliseconds()) * 100
-	run.onProgress.Execute(&ProgressArg{percent: percent, progressTime: progressTime})
+	run.updateProgress(progressTime)
 }

@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"mylife-home-common/tools"
 	"strconv"
 	"strings"
 	"time"
@@ -84,39 +83,36 @@ func (s *waitStep) Execute(run *runningData) {
 var _ step = (*setOutputStep[int])(nil)
 
 type setOutputStep[Value any] struct {
-	onOutput *tools.CallbackManager[*OutputArg[Value]]
-	index    int
-	value    Value
+	setOutput func(index int, value Value)
+	index     int
+	value     Value
 }
 
-func newSetOutputStep[Value any](onOutput *tools.CallbackManager[*OutputArg[Value]], index int, value Value) step {
+func newSetOutputStep[Value any](setOutput func(index int, value Value), index int, value Value) step {
 	return &setOutputStep[Value]{
-		onOutput: onOutput,
-		index:    index,
-		value:    value,
+		setOutput: setOutput,
+		index:     index,
+		value:     value,
 	}
 }
 
 func (s *setOutputStep[Value]) Execute(run *runningData) {
 	logger.Debugf("Execute SetOutputStep: set output #%d to '%+v'", s.index, s.value)
 
-	s.onOutput.Execute(&OutputArg[Value]{
-		index: s.index,
-		value: s.value,
-	})
+	s.setOutput(s.index, s.value)
 }
 
 var _ step = (*setAllOutputsStep[int])(nil)
 
 type setAllOutputsStep[Value any] struct {
-	onOutput *tools.CallbackManager[*OutputArg[Value]]
-	value    Value
+	setOutput func(index int, value Value)
+	value     Value
 }
 
-func newSetAllOutputsStep[Value any](onOutput *tools.CallbackManager[*OutputArg[Value]], value Value) step {
+func newSetAllOutputsStep[Value any](setOutput func(index int, value Value), value Value) step {
 	return &setAllOutputsStep[Value]{
-		onOutput: onOutput,
-		value:    value,
+		setOutput: setOutput,
+		value:     value,
 	}
 }
 
@@ -124,9 +120,6 @@ func (s *setAllOutputsStep[Value]) Execute(run *runningData) {
 	logger.Debugf("Execute SetAllOutputStep: set all outputs to '%+v'", s.value)
 
 	for index := 0; index < outputCount; index += 1 {
-		s.onOutput.Execute(&OutputArg[Value]{
-			index: index,
-			value: s.value,
-		})
+		s.setOutput(index, s.value)
 	}
 }
