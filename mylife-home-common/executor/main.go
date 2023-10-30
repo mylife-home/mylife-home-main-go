@@ -15,8 +15,17 @@ var mainChan chan func()
 var wg sync.WaitGroup
 
 // Start the executor on the current goroutine
-func Run() {
+//
+// Optionaly enqueue callbacks on startup
+func Run(callbacks ...func()) {
 	setup()
+
+	// Cannot enqueue them right now because we are not buffered before loop start
+	go func() {
+		for _, callback := range callbacks {
+			Execute(callback)
+		}
+	}()
 
 	wg.Add(1)
 	loop()
@@ -69,7 +78,7 @@ func CreateExecutor() Executor {
 func loop() {
 	defer wg.Done()
 
-	bufferedIn, bufferedOut := tools.BufferedChannel[func()]()
+	bufferedOut, bufferedIn := tools.BufferedChannel[func()]()
 	tools.PipeChannel(mainLoopChan.Out(), bufferedOut)
 
 	for callback := range bufferedIn {

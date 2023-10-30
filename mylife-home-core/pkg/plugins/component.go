@@ -140,7 +140,7 @@ func (comp *Component) stopLoop() {
 func (comp *Component) loop() {
 	defer comp.wg.Done()
 
-	bufferedIn, bufferedOut := tools.BufferedChannel[func()]()
+	bufferedOut, bufferedIn := tools.BufferedChannel[func()]()
 	tools.PipeChannel(comp.mainLoopChan.Out(), bufferedOut)
 
 	for callback := range bufferedIn {

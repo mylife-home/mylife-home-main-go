@@ -3,6 +3,7 @@ package bus
 import (
 	"fmt"
 	"math/rand"
+	"mylife-home-common/executor"
 	"mylife-home-common/tools"
 	"time"
 )
@@ -176,7 +177,7 @@ func (svc *rpcServiceImpl[TInput, TOutput]) runAsync(payload []byte) {
 	go func() {
 		resp := svc.handle(&req)
 
-		tools.MainLoop.Execute(func() {
+		executor.Execute(func() {
 			output := Encoding.WriteJson(resp)
 			svc.client.PublishNoWait(req.ReplyTopic, output, false)
 		})

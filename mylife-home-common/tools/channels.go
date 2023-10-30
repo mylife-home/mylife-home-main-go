@@ -44,7 +44,7 @@ func (m *ChannelMerger[T]) Out() <-chan T {
 	return m.out
 }
 
-func BufferedChannel[T any]() (<-chan T, chan<- T) {
+func BufferedChannel[T any]() (chan<- T, <-chan T) {
 	in := make(chan T)
 	out := make(chan T)
 
