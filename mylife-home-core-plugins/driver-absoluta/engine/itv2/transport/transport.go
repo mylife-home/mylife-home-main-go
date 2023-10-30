@@ -62,7 +62,11 @@ func (data *TransportData) isOutgoingACKRequired() bool {
 }
 
 func (data *TransportData) computeNext(value int) int {
-	return (value + 1) % 256
+	if value < 255 {
+		return value + 1
+	} else {
+		return 1
+	}
 }
 
 func (data *TransportData) pushSendQueue(input *bytes.Buffer) {
