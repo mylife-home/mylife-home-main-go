@@ -56,7 +56,8 @@ func (rpc *Rpc) Unserve(address string) error {
 }
 
 // Cannot use member function because of generic
-func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address string, data TInput, timeout time.Duration) (TOutput, error) {
+// Must be executed on MainLoop.
+func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address string, data TInput, timeout time.Duration, callback func(TOutput, error)) {
 	replyId := randomTopicPart()
 	replyTopic := rpc.client.BuildTopic(rpcDomain, rpcReplies, replyId)
 	remoteTopic := rpc.client.BuildRemoteTopic(targetInstance, rpcDomain, rpcServices, address)
@@ -111,14 +112,24 @@ func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address s
 type rpcServiceImpl[TInput any, TOutput any] struct {
 	client         *client
 	address        string
+	sync           bool
 	implementation func(TInput) (TOutput, error)
 	msgToken       tools.RegistrationToken
 }
 
-// Note: Implementation is executed in its own goroutine. You may want to run MainLoop.Execute() to synchronize.
-func NewRpcService[TInput any, TOutput any](implementation func(TInput) (TOutput, error)) RpcService {
+// Note: Implementation is executed in its own goroutine.
+func NewRpcServiceAsync[TInput any, TOutput any](implementation func(TInput) (TOutput, error)) RpcService {
 	return &rpcServiceImpl[TInput, TOutput]{
 		implementation: implementation,
+		sync:           false,
+	}
+}
+
+// Note: Implementation is executed in MainLoop goroutine
+func NewRpcServiceSync[TInput any, TOutput any](implementation func(TInput) (TOutput, error)) RpcService {
+	return &rpcServiceImpl[TInput, TOutput]{
+		implementation: implementation,
+		sync:           true,
 	}
 }
 
@@ -141,8 +152,26 @@ func (svc *rpcServiceImpl[TInput, TOutput]) onMessage(m *message) {
 		return
 	}
 
+	if svc.sync {
+		svc.runSync(m.Payload())
+	} else {
+		svc.runAsync(m.Payload())
+	}
+}
+
+func (svc *rpcServiceImpl[TInput, TOutput]) runSync(payload []byte) {
 	var req request[TInput]
-	Encoding.ReadTypedJson(m.Payload(), &req)
+	Encoding.ReadTypedJson(payload, &req)
+
+	resp := svc.handle(&req)
+
+	output := Encoding.WriteJson(resp)
+	svc.client.PublishNoWait(req.ReplyTopic, output, false)
+}
+
+func (svc *rpcServiceImpl[TInput, TOutput]) runAsync(payload []byte) {
+	var req request[TInput]
+	Encoding.ReadTypedJson(payload, &req)
 
 	go func() {
 		resp := svc.handle(&req)
