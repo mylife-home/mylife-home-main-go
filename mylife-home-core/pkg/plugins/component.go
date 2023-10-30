@@ -69,10 +69,12 @@ func (comp *Component) ExecuteAction(actionName string, arg any) {
 	})
 }
 
-// Connect state change channel to the component (on main loop)
-func (comp *Component) DispatchStateChange(stateName string, value any) {
-	comp.state[stateName] = value
-	comp.onStateChange.Execute(components.NewStateChange(stateName, value))
+// Called from component loop on state change
+func (comp *Component) stateChanged(stateName string, value any) {
+	tools.MainLoop.Execute(func() {
+		comp.state[stateName] = value
+		comp.onStateChange.Execute(components.NewStateChange(stateName, value))
+	})
 }
 
 func (comp *Component) Init() error {

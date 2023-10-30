@@ -23,9 +23,7 @@ type stateImpl[T comparable] struct {
 	mutex sync.Mutex
 	value T
 
-	componentId string
-	stateName   string
-	channel     chan<- StateChange
+	onEmit func(any)
 }
 
 func (state *stateImpl[T]) Get() T {
@@ -46,17 +44,11 @@ func (state *stateImpl[T]) Set(value T) {
 }
 
 func (state *stateImpl[T]) emit() {
-	state.channel <- StateChange{
-		ComponentId: state.componentId,
-		StateName:   state.stateName,
-		Value:       state.value,
-	}
+	state.onEmit(state.value)
 }
 
-func (state *stateImpl[T]) init(componentId string, stateName string, channel chan<- StateChange) {
-	state.componentId = componentId
-	state.stateName = stateName
-	state.channel = channel
+func (state *stateImpl[T]) init(onEmit func(value any)) {
+	state.onEmit = onEmit
 
 	// emit initial state
 	state.emit()
@@ -64,10 +56,10 @@ func (state *stateImpl[T]) init(componentId string, stateName string, channel ch
 
 type privateState interface {
 	untypedState
-	init(componentId string, stateName string, channel chan<- StateChange)
+	init(onEmit func(value any))
 }
 
-func makeStateImpl(componentId string, stateName string, typ metadata.Type, channel chan<- StateChange) untypedState {
+func makeStateImpl(typ metadata.Type, onEmit func(value any)) untypedState {
 	var state privateState
 	switch typ.(type) {
 	case *metadata.RangeType:
@@ -86,7 +78,7 @@ func makeStateImpl(componentId string, stateName string, typ metadata.Type, chan
 		panic(fmt.Sprintf("Unexpected type '%s'", typ.String()))
 	}
 
-	state.init(componentId, stateName, channel)
+	state.init(onEmit)
 
 	return state
 }

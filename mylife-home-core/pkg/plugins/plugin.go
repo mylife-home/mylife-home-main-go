@@ -55,7 +55,7 @@ func (plugin *Plugin) Metadata() *metadata.Plugin {
 	return plugin.meta
 }
 
-func (plugin *Plugin) Instantiate(id string, config map[string]any, stateChangeChannel chan<- StateChange) (*Component, error) {
+func (plugin *Plugin) Instantiate(id string, config map[string]any) (*Component, error) {
 	if err := plugin.validateConfig(config); err != nil {
 		return nil, err
 	}
@@ -65,10 +65,6 @@ func (plugin *Plugin) Instantiate(id string, config map[string]any, stateChangeC
 
 	// Prepare it
 	actions := make(map[string]func(any))
-
-	for _, stateItem := range plugin.state {
-		stateItem.init(id, compPtr, stateChangeChannel)
-	}
 
 	for name, action := range plugin.actions {
 		actions[name] = action.init(compPtr)
@@ -83,6 +79,10 @@ func (plugin *Plugin) Instantiate(id string, config map[string]any, stateChangeC
 	target := compPtr.Interface().(definitions.Plugin)
 
 	comp := newComponent(id, plugin, target, actions)
+
+	for _, stateItem := range plugin.state {
+		stateItem.init(compPtr, comp)
+	}
 
 	logger.Infof("Component created: '%s'", comp.id)
 	logger.Debugf("Configuration applied (component='%s'): %+v", comp.id, config)
@@ -123,11 +123,13 @@ func makeStateItem(stateType *registry.StateType) *pluginStateItem {
 	}
 }
 
-func (s *pluginStateItem) init(compId string, compPtr reflect.Value, stateChangeChannel chan<- StateChange) {
-	impl := makeStateImpl(compId, s.meta.Name(), s.meta.ValueType(), stateChangeChannel)
+func (s *pluginStateItem) init(compPtr reflect.Value, comp *Component) {
+	impl := makeStateImpl(s.meta.ValueType(), func(value any) {
+		comp.stateChanged(s.meta.Name(), value)
+	})
 
-	comp := compPtr.Elem()
-	comp.FieldByName(s.target.Name).Set(reflect.ValueOf(impl))
+	target := compPtr.Elem()
+	target.FieldByName(s.target.Name).Set(reflect.ValueOf(impl))
 }
 
 type pluginAction struct {
