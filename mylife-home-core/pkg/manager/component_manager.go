@@ -56,7 +56,7 @@ func makeComponentManager(transport *bus.Transport) *componentManager {
 	}
 
 	err := manager.store.Load()
-	panics.IsTrue(err == nil, "error loading store: %w", err)
+	panics.IsTrue(err == nil, "error loading store: %s", err)
 
 	if !manager.supportsBindings && manager.store.HasBindings() {
 		panic("store has bindings but configuration does not activate its support")
@@ -67,10 +67,10 @@ func makeComponentManager(transport *bus.Transport) *componentManager {
 		panics.IsTrue(pluginInstance != nil, "plugin does not exists: '%s'", config.Plugin)
 
 		pluginConfig, err := manager.buildConfig(pluginInstance.Metadata(), config.Config)
-		panics.IsTrue(err == nil, "could not create plugin config for plugin '%s': %w", pluginInstance.Metadata().Id(), err)
+		panics.IsTrue(err == nil, "could not create plugin config for plugin '%s': %s", pluginInstance.Metadata().Id(), err)
 
 		comp, err := pluginInstance.Instantiate(config.Id, pluginConfig)
-		panics.IsTrue(err == nil, "could not create component '%s' (plugin='%s'): %w", config.Id, pluginInstance.Metadata().Id(), err)
+		panics.IsTrue(err == nil, "could not create component '%s' (plugin='%s'): %s", config.Id, pluginInstance.Metadata().Id(), err)
 
 		manager.components[config.Id] = comp
 		manager.registry.AddComponent("", comp)
