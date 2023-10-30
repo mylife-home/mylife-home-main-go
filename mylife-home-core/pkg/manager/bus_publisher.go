@@ -5,8 +5,8 @@ import (
 	"mylife-home-common/components"
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/tools"
-	"sync"
 
+	"github.com/gookit/goutil/errorx/panics"
 	"golang.org/x/exp/maps"
 )
 
@@ -18,7 +18,6 @@ type busPublisher struct {
 	registry             *components.Registry
 	busPlugins           map[*metadata.Plugin]*busPlugin
 	busComponents        map[components.Component]*busComponent
-	mux                  sync.Mutex
 	componentChangeToken tools.RegistrationToken
 	pluginChangeToken    tools.RegistrationToken
 	onlineChangeToken    tools.RegistrationToken
@@ -95,44 +94,30 @@ func (publisher *busPublisher) onComponentChange(change *components.ComponentCha
 }
 
 func (publisher *busPublisher) publishPlugin(plugin *metadata.Plugin) {
-	publisher.mux.Lock()
-	defer publisher.mux.Unlock()
-
 	bp := newBusPlugin(plugin, publisher.transport)
 	publisher.busPlugins[plugin] = bp
 }
 
 func (publisher *busPublisher) unpublishPlugin(plugin *metadata.Plugin) {
-	publisher.mux.Lock()
-	defer publisher.mux.Unlock()
-
 	bp := publisher.busPlugins[plugin]
 	bp.close()
 	delete(publisher.busPlugins, plugin)
 }
 
 func (publisher *busPublisher) publishComponent(component components.Component) {
-	publisher.mux.Lock()
-	defer publisher.mux.Unlock()
-
 	bc := newBusComponent(component, publisher.transport)
 	publisher.busComponents[component] = bc
 }
 
 func (publisher *busPublisher) unpublishComponent(component components.Component) {
-	publisher.mux.Lock()
-	defer publisher.mux.Unlock()
-
 	bc := publisher.busComponents[component]
 	bc.close()
 	delete(publisher.busComponents, component)
 }
 
 func (publisher *busPublisher) onOnlineChange(online bool) {
-	publisher.mux.Lock()
 	plugins := maps.Values(publisher.busPlugins)
 	components := maps.Values(publisher.busComponents)
-	publisher.mux.Unlock()
 
 	// process plugins first, then components
 	//  - on online : when a component is published, its plugin must already exist
@@ -279,6 +264,8 @@ func (bc *busComponent) publishComponent() {
 
 		case metadata.State:
 			value := bc.component.GetStateItem(name)
+			panics.IsTrue(value != nil, "State missing: %s.%s (plugin=%s)", bc.component.Id(), name, bc.component.Plugin().Id())
+
 			bc.publishState(name, value)
 		}
 	}

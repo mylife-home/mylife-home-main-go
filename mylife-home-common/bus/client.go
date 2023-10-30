@@ -138,6 +138,10 @@ func (client *client) goToken(token mqtt.Token) {
 	go func() {
 		token.Wait()
 
+		if token.Error() != nil && !client.mqtt.IsConnected() {
+			return
+		}
+
 		if err := token.Error(); err != nil {
 			logger.WithError(err).Error("error on token")
 		}

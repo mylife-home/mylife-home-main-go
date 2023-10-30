@@ -47,19 +47,17 @@ func (state *stateImpl[T]) emit() {
 	state.onEmit(state.value)
 }
 
-func (state *stateImpl[T]) init(onEmit func(value any)) {
+func (state *stateImpl[T]) init(onEmit func(value any)) any {
 	state.onEmit = onEmit
-
-	// emit initial state
-	state.emit()
+	return state.value // initial value
 }
 
 type privateState interface {
 	untypedState
-	init(onEmit func(value any))
+	init(onEmit func(value any)) any
 }
 
-func makeStateImpl(typ metadata.Type, onEmit func(value any)) untypedState {
+func makeStateImpl(typ metadata.Type, onEmit func(value any), initialValue *any) untypedState {
 	var state privateState
 	switch typ.(type) {
 	case *metadata.RangeType:
@@ -78,7 +76,7 @@ func makeStateImpl(typ metadata.Type, onEmit func(value any)) untypedState {
 		panic(fmt.Sprintf("Unexpected type '%s'", typ.String()))
 	}
 
-	state.init(onEmit)
+	*initialValue = state.init(onEmit)
 
 	return state
 }

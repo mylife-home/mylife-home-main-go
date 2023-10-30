@@ -124,9 +124,13 @@ func makeStateItem(stateType *registry.StateType) *pluginStateItem {
 }
 
 func (s *pluginStateItem) init(compPtr reflect.Value, comp *Component) {
-	impl := makeStateImpl(s.meta.ValueType(), func(value any) {
+	onEmit := func(value any) {
 		comp.stateChanged(s.meta.Name(), value)
-	})
+	}
+
+	var initialValue any
+	impl := makeStateImpl(s.meta.ValueType(), onEmit, &initialValue)
+	comp.state[s.meta.Name()] = initialValue
 
 	target := compPtr.Elem()
 	target.FieldByName(s.target.Name).Set(reflect.ValueOf(impl))

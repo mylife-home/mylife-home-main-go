@@ -10,7 +10,6 @@ import (
 	"mylife-home-core/pkg/plugins"
 	"mylife-home-core/pkg/store"
 	"strings"
-	"sync"
 
 	"golang.org/x/exp/slices"
 )
@@ -23,7 +22,6 @@ type componentManager struct {
 	store            *store.Store
 	components       map[string]*plugins.Component
 	bindings         map[string]*binding
-	mux              sync.Mutex
 }
 
 func makeComponentManager(transport *bus.Transport) (*componentManager, error) {
@@ -96,9 +94,6 @@ func makeComponentManager(transport *bus.Transport) (*componentManager, error) {
 }
 
 func (manager *componentManager) Terminate() {
-	manager.mux.Lock()
-	defer manager.mux.Unlock()
-
 	for _, binding := range manager.bindings {
 		binding.Terminate()
 	}
@@ -119,9 +114,6 @@ func (manager *componentManager) SupportsBindings() bool {
 }
 
 func (manager *componentManager) AddComponent(id string, plugin string, config map[string]json.RawMessage) error {
-	manager.mux.Lock()
-	defer manager.mux.Unlock()
-
 	if _, exists := manager.components[id]; exists {
 		return fmt.Errorf("component id duplicate: '%s'", id)
 	}
@@ -153,9 +145,6 @@ func (manager *componentManager) AddComponent(id string, plugin string, config m
 }
 
 func (manager *componentManager) RemoveComponent(id string) error {
-	manager.mux.Lock()
-	defer manager.mux.Unlock()
-
 	comp, exists := manager.components[id]
 	if !exists {
 		return fmt.Errorf("component id does not exist: '%s'", id)
@@ -170,16 +159,10 @@ func (manager *componentManager) RemoveComponent(id string) error {
 }
 
 func (manager *componentManager) GetComponents() []*store.ComponentConfig {
-	manager.mux.Lock()
-	defer manager.mux.Unlock()
-
 	return slices.Clone(manager.store.GetComponents())
 }
 
 func (manager *componentManager) AddBinding(config *store.BindingConfig) error {
-	manager.mux.Lock()
-	defer manager.mux.Unlock()
-
 	key := manager.buildBindingKey(config)
 	if _, exists := manager.bindings[key]; exists {
 		return fmt.Errorf("binding already exists: '%s'", config)
@@ -192,9 +175,6 @@ func (manager *componentManager) AddBinding(config *store.BindingConfig) error {
 }
 
 func (manager *componentManager) RemoveBinding(config *store.BindingConfig) error {
-	manager.mux.Lock()
-	defer manager.mux.Unlock()
-
 	key := manager.buildBindingKey(config)
 	binding, exists := manager.bindings[key]
 	if !exists {
@@ -209,16 +189,10 @@ func (manager *componentManager) RemoveBinding(config *store.BindingConfig) erro
 }
 
 func (manager *componentManager) GetBindings() []*store.BindingConfig {
-	manager.mux.Lock()
-	defer manager.mux.Unlock()
-
 	return slices.Clone(manager.store.GetBindings())
 }
 
 func (manager *componentManager) Save() error {
-	manager.mux.Lock()
-	defer manager.mux.Unlock()
-
 	return manager.store.Save()
 }
 
