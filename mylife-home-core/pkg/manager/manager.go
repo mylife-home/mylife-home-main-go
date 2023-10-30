@@ -20,16 +20,13 @@ type Manager struct {
 	cm        *componentManager
 }
 
-func MakeManager() (*Manager, error) {
+func MakeManager() *Manager {
 	conf := managerConfig{}
 	config.BindStructure("manager", &conf)
 
 	supportsBindings := conf.SupportsBindings
 	transport := bus.NewTransport(bus.NewOptions().SetPresenceTracking(supportsBindings))
-	cm, err := makeComponentManager(transport)
-	if err != nil {
-		return nil, err
-	}
+	cm := makeComponentManager(transport)
 
 	manager := &Manager{
 		transport: transport,
@@ -56,7 +53,7 @@ func MakeManager() (*Manager, error) {
 
 	instance_info.AddCapability("store-api")
 
-	return manager, nil
+	return manager
 }
 
 func (manager *Manager) Terminate() {

@@ -1,6 +1,8 @@
 package store
 
-import "os"
+import (
+	"os"
+)
 
 var _ storeOperations = (*FsOperations)(nil)
 
@@ -17,16 +19,9 @@ func (operations *FsOperations) Save(data []byte) error {
 }
 
 func init() {
-	registerOperations("fs", func(config map[string]any) (storeOperations, error) {
-		path, err := getConfigValue[string](config, "path")
-		if err != nil {
-			return nil, err
+	registerOperations("fs", func(config map[string]any) storeOperations {
+		return &FsOperations{
+			path: getConfigValue[string](config, "path"),
 		}
-
-		ops := &FsOperations{
-			path: path,
-		}
-
-		return ops, nil
 	})
 }

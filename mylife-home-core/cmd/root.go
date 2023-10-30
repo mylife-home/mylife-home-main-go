@@ -57,23 +57,12 @@ func setupSignals() {
 }
 
 func setupManager() {
-	var err error
-
-	m, err = manager.MakeManager()
-	if err != nil {
-		logger.WithError(err).Error("Failed to initialize manager")
-		exit()
-		return
-	}
+	m = manager.MakeManager()
 }
 
 func exit() {
 	logger.Debug("Exit initiated")
-
-	if m != nil {
-		executor.Execute(m.Terminate)
-	}
-
+	executor.Execute(m.Terminate)
 	executor.Stop(false)
 }
 

@@ -11,6 +11,7 @@ import (
 	"mylife-home-core/pkg/store"
 	"strings"
 
+	"github.com/gookit/goutil/errorx/panics"
 	"golang.org/x/exp/slices"
 )
 
@@ -24,11 +25,8 @@ type componentManager struct {
 	bindings         map[string]*binding
 }
 
-func makeComponentManager(transport *bus.Transport) (*componentManager, error) {
-	store, err := store.MakeStore()
-	if err != nil {
-		return nil, err
-	}
+func makeComponentManager(transport *bus.Transport) *componentManager {
+	store := store.MakeStore()
 
 	manager := &componentManager{
 		transport:  transport,
@@ -57,29 +55,22 @@ func makeComponentManager(transport *bus.Transport) (*componentManager, error) {
 		manager.registry.AddPlugin("", pluginInstance.Metadata())
 	}
 
-	if err := manager.store.Load(); err != nil {
-		return nil, err
-	}
+	err := manager.store.Load()
+	panics.IsTrue(err == nil, "error loading store: %w", err)
 
 	if !manager.supportsBindings && manager.store.HasBindings() {
-		return nil, fmt.Errorf("store has bindings but configuration does not activate its support")
+		panic("store has bindings but configuration does not activate its support")
 	}
 
 	for _, config := range manager.store.GetComponents() {
 		pluginInstance := plugins.GetPlugin(config.Plugin)
-		if pluginInstance == nil {
-			return nil, fmt.Errorf("plugin does not exists: '%s'", config.Plugin)
-		}
+		panics.IsTrue(pluginInstance != nil, "plugin does not exists: '%s'", config.Plugin)
 
 		pluginConfig, err := manager.buildConfig(pluginInstance.Metadata(), config.Config)
-		if err != nil {
-			return nil, fmt.Errorf("could not create plugin config for plugin '%s': %w", pluginInstance.Metadata().Id(), err)
-		}
+		panics.IsTrue(err == nil, "could not create plugin config for plugin '%s': %w", pluginInstance.Metadata().Id(), err)
 
 		comp, err := pluginInstance.Instantiate(config.Id, pluginConfig)
-		if err != nil {
-			return nil, err
-		}
+		panics.IsTrue(err == nil, "could not create component '%s' (plugin='%s'): %w", config.Id, pluginInstance.Metadata().Id(), err)
 
 		manager.components[config.Id] = comp
 		manager.registry.AddComponent("", comp)
@@ -90,7 +81,7 @@ func makeComponentManager(transport *bus.Transport) (*componentManager, error) {
 		manager.bindings[key] = makeBinding(manager.registry, config)
 	}
 
-	return manager, nil
+	return manager
 }
 
 func (manager *componentManager) Terminate() {

@@ -25,14 +25,11 @@ type Store struct {
 	mux        sync.Mutex // Need to sync because Save() is executed in its own goroutine
 }
 
-func MakeStore() (*Store, error) {
+func MakeStore() *Store {
 	conf := storeConfig{}
 	config.BindStructure("store", &conf)
 
-	operations, err := makeOperations(conf.Type, conf.OperationsConfig)
-	if err != nil {
-		return nil, err
-	}
+	operations := makeOperations(conf.Type, conf.OperationsConfig)
 
 	store := &Store{
 		operations: operations,
@@ -40,7 +37,7 @@ func MakeStore() (*Store, error) {
 		bindings:   make(map[string]*BindingConfig),
 	}
 
-	return store, nil
+	return store
 }
 
 func (store *Store) Load() error {
