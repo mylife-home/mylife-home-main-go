@@ -103,11 +103,7 @@ func (logger *Logger) send(e *publish.LogEntry) {
 		fmt.Printf("Error marshaling log: '%f'\n", err)
 	}
 
-	err = logger.client.Publish(logger.client.BuildTopic(loggerDomain), raw, false)
-	if err != nil {
-		// Note: should log it, but it would cause more entries
-		fmt.Printf("Error sending log: '%f'\n", err)
-	}
+	logger.client.Publish(logger.client.BuildTopic(loggerDomain), raw, false)
 }
 
 func convertLevel(level publish.LogLevel) int {

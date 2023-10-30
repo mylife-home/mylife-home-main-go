@@ -42,7 +42,7 @@ func newPresence(client *client, presenceTracking bool) *Presence {
 		presence.client.OnOnlineChanged().Register(presence.onOnlineChange)
 		presence.client.OnMessage().Register(presence.onMessage)
 
-		presence.client.SubscribeNoWait("+/online")
+		presence.client.Subscribe("+/online")
 	}
 
 	return presence

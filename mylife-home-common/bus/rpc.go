@@ -27,37 +27,34 @@ func newRpc(client *client) *Rpc {
 }
 
 type RpcService interface {
-	init(client *client, address string) error
-	terminate() error
+	init(client *client, address string)
+	terminate()
 }
 
-func (rpc *Rpc) Serve(address string, svc RpcService) error {
+func (rpc *Rpc) Serve(address string, svc RpcService) {
 	_, exists := rpc.services[address]
 	if exists {
 		panic(fmt.Errorf("service with address '%s' does already exist", address))
 	}
 
-	if err := svc.init(rpc.client, address); err != nil {
-		return err
-	}
+	svc.init(rpc.client, address)
 
 	rpc.services[address] = svc
-	return nil
 }
 
-func (rpc *Rpc) Unserve(address string) error {
+func (rpc *Rpc) Unserve(address string) {
 	svc, exists := rpc.services[address]
 	if !exists {
 		panic(fmt.Errorf("service with address '%s' does not exist", address))
 	}
 
-	err := svc.terminate()
+	svc.terminate()
 	delete(rpc.services, address)
-	return err
 }
 
 // Cannot use member function because of generic
-// Must be executed on MainLoop.
+// TODO: need reviews
+/*
 func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address string, data TInput, timeout time.Duration, callback func(TOutput, error)) {
 	replyId := randomTopicPart()
 	replyTopic := rpc.client.BuildTopic(rpcDomain, rpcReplies, replyId)
@@ -109,6 +106,7 @@ func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address s
 
 	return *resp.Output, nil
 }
+*/
 
 type rpcServiceImpl[TInput any, TOutput any] struct {
 	client         *client
@@ -134,18 +132,17 @@ func NewRpcServiceSync[TInput any, TOutput any](implementation func(TInput) (TOu
 	}
 }
 
-func (svc *rpcServiceImpl[TInput, TOutput]) init(client *client, address string) error {
+func (svc *rpcServiceImpl[TInput, TOutput]) init(client *client, address string) {
 	svc.client = client
 	svc.address = address
 
 	svc.msgToken = svc.client.OnMessage().Register(svc.onMessage)
-	return svc.client.Subscribe(svc.buildTopic())
+	svc.client.Subscribe(svc.buildTopic())
 }
 
-func (svc *rpcServiceImpl[TInput, TOutput]) terminate() error {
-	err := svc.client.Unsubscribe(svc.buildTopic())
+func (svc *rpcServiceImpl[TInput, TOutput]) terminate() {
+	svc.client.Unsubscribe(svc.buildTopic())
 	svc.client.OnMessage().Unregister(svc.msgToken)
-	return err
 }
 
 func (svc *rpcServiceImpl[TInput, TOutput]) onMessage(m *message) {
@@ -167,7 +164,7 @@ func (svc *rpcServiceImpl[TInput, TOutput]) runSync(payload []byte) {
 	resp := svc.handle(&req)
 
 	output := Encoding.WriteJson(resp)
-	svc.client.PublishNoWait(req.ReplyTopic, output, false)
+	svc.client.Publish(req.ReplyTopic, output, false)
 }
 
 func (svc *rpcServiceImpl[TInput, TOutput]) runAsync(payload []byte) {
@@ -184,7 +181,7 @@ func (svc *rpcServiceImpl[TInput, TOutput]) runAsync(payload []byte) {
 
 		exec.Execute(func() {
 			output := Encoding.WriteJson(resp)
-			svc.client.PublishNoWait(req.ReplyTopic, output, false)
+			svc.client.Publish(req.ReplyTopic, output, false)
 		})
 	}()
 }
