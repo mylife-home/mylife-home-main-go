@@ -6,6 +6,7 @@ import (
 	"mylife-home-common/tools"
 	"strings"
 
+	"github.com/gookit/goutil/errorx/panics"
 	"golang.org/x/exp/maps"
 )
 
@@ -223,6 +224,8 @@ func newBusComponent(transport *bus.Transport, instanceName string, registry *Re
 		state:         make(map[string]any),
 		onStateChange: tools.NewCallbackManager[*StateChange](),
 	}
+
+	panics.IsTrue(comp.plugin != nil, "could not find plugin '%s:%s' of component '%s'", instanceName, netComp.Plugin(), netComp.Id())
 
 	comp.remoteComponent = transport.Components().TrackRemoteComponent(comp.instanceName, comp.id)
 
