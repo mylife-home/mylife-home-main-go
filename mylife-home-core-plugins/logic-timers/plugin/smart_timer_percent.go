@@ -107,7 +107,9 @@ func (component *SmartTimerPercent) Init(runtime definitions.Runtime) error {
 }
 
 func (component *SmartTimerPercent) Terminate() {
-	component.clear()
+	if component.triggerProgram.Running() {
+		component.triggerProgram.Interrupt()
+	}
 
 	component.executor.Terminate()
 }

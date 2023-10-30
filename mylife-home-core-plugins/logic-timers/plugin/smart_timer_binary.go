@@ -106,7 +106,9 @@ func (component *SmartTimerBinary) Init(runtime definitions.Runtime) error {
 }
 
 func (component *SmartTimerBinary) Terminate() {
-	component.clear()
+	if component.triggerProgram.Running() {
+		component.triggerProgram.Interrupt()
+	}
 
 	component.executor.Terminate()
 }
