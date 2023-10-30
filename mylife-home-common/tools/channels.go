@@ -92,6 +92,8 @@ func BufferedChannel[T any]() (chan<- T, <-chan T) {
 
 func MapChannel[TIn any, TOut any](in <-chan TIn, out chan<- TOut, mapper func(in TIn) TOut) {
 	go func() {
+		defer close(out)
+
 		for vin := range in {
 			out <- mapper(vin)
 		}
@@ -100,6 +102,8 @@ func MapChannel[TIn any, TOut any](in <-chan TIn, out chan<- TOut, mapper func(i
 
 func PipeChannel[T any](in <-chan T, out chan<- T) {
 	go func() {
+		defer close(out)
+
 		for vin := range in {
 			out <- vin
 		}
