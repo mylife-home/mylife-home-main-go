@@ -75,7 +75,7 @@ func exit() {
 	logger.Debug("Exit initiated")
 
 	if m != nil {
-		m.Terminate()
+		executor.Execute(m.Terminate)
 	}
 
 	executor.Stop(false)
