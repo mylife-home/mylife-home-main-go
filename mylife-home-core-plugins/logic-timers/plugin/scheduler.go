@@ -28,6 +28,7 @@ type Scheduler struct {
 	// @State(description="Timestamp JS avant le prochain déclenchement")
 	NextDate definitions.State[float64]
 
+	executor   definitions.Executor
 	cronEngine *cron.Cron
 	cronJobId  cron.EntryID // 0 = no job
 }
@@ -35,6 +36,7 @@ type Scheduler struct {
 func (component *Scheduler) Init(runtime definitions.Runtime) error {
 	component.Enabled.Set(true)
 
+	component.executor = runtime.NewExecutor()
 	component.cronEngine = cron.New()
 
 	if err := component.setupScheduler(); err != nil {
@@ -77,6 +79,8 @@ func (component *Scheduler) Terminate() {
 
 	ctx := component.cronEngine.Stop()
 	<-ctx.Done()
+
+	component.executor.Terminate()
 }
 
 // @Action(description="Permet de désactiver le scheduler. Le trigger reste alors à 'false'")
@@ -87,16 +91,18 @@ func (component *Scheduler) Disable(arg bool) {
 }
 
 func (component *Scheduler) onTick() {
-	if component.Enabled.Get() {
-		logger.Debug("Scheduler trigger")
+	component.executor.Execute(func() {
+		if component.Enabled.Get() {
+			logger.Debug("Scheduler trigger")
 
-		component.Trigger.Set(true)
-		component.Trigger.Set(false)
-	} else {
-		logger.Debug("Skipping scheduler trigger (disabled)")
-	}
+			component.Trigger.Set(true)
+			component.Trigger.Set(false)
+		} else {
+			logger.Debug("Skipping scheduler trigger (disabled)")
+		}
 
-	component.refreshNextDate()
+		component.refreshNextDate()
+	})
 }
 
 func (component *Scheduler) refreshNextDate() {

@@ -60,6 +60,7 @@ type SmartTimerBinary struct {
 	// @State()
 	Output9 definitions.State[bool]
 
+	executor       definitions.Executor
 	initProgram    *engine.Program[bool]
 	triggerProgram *engine.Program[bool]
 	cancelProgram  *engine.Program[bool]
@@ -67,6 +68,8 @@ type SmartTimerBinary struct {
 }
 
 func (component *SmartTimerBinary) Init(runtime definitions.Runtime) error {
+	component.executor = runtime.NewExecutor()
+
 	component.TotalTime.Set(0)
 	component.ProgressTime.Set(0)
 	component.Progress.Set(0)
@@ -84,9 +87,9 @@ func (component *SmartTimerBinary) Init(runtime definitions.Runtime) error {
 		component.Output9,
 	}
 
-	component.initProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigInitProgram, false)
-	component.triggerProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigTriggerProgram, true)
-	component.cancelProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigCancelProgram, false)
+	component.initProgram = engine.NewProgram[bool](component.executor, component.parseOutputValue, component.ConfigInitProgram, false)
+	component.triggerProgram = engine.NewProgram[bool](component.executor, component.parseOutputValue, component.ConfigTriggerProgram, true)
+	component.cancelProgram = engine.NewProgram[bool](component.executor, component.parseOutputValue, component.ConfigCancelProgram, false)
 
 	component.triggerProgram.OnProgress().Register(component.onProgress)
 	component.triggerProgram.OnRunning().Register(component.onRunning)
@@ -103,6 +106,8 @@ func (component *SmartTimerBinary) Init(runtime definitions.Runtime) error {
 
 func (component *SmartTimerBinary) Terminate() {
 	component.clear()
+
+	component.executor.Terminate()
 }
 
 // @Action
