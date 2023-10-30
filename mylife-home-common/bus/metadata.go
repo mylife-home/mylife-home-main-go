@@ -51,13 +51,13 @@ func newMetadata(client *client) *Metadata {
 func (meta *Metadata) Set(path string, value any) {
 	topic := meta.client.BuildTopic(metadataDomain, path)
 
-	meta.client.PublishNoWait(topic, Encoding.WriteJson(value), true)
+	meta.client.Publish(topic, Encoding.WriteJson(value), true)
 }
 
 func (meta *Metadata) Clear(path string) {
 	topic := meta.client.BuildTopic(metadataDomain, path)
 
-	meta.client.PublishNoWait(topic, []byte{}, true)
+	meta.client.Publish(topic, []byte{}, true)
 }
 
 func (meta *Metadata) CreateView(remoteInstanceName string) RemoteMetadataView {
@@ -70,7 +70,7 @@ func (meta *Metadata) CreateView(remoteInstanceName string) RemoteMetadataView {
 
 	view.msgToken = view.client.OnMessage().Register(view.onMessage)
 
-	view.client.SubscribeNoWait(view.listenTopic())
+	view.client.Subscribe(view.listenTopic())
 
 	return view
 }
@@ -79,7 +79,7 @@ func (meta *Metadata) CloseView(view RemoteMetadataView) {
 	viewImpl := view.(*remoteMetadataView)
 	viewImpl.client.OnMessage().Unregister(viewImpl.msgToken)
 
-	viewImpl.client.UnsubscribeNoWait(viewImpl.listenTopic())
+	viewImpl.client.Unsubscribe(viewImpl.listenTopic())
 }
 
 type remoteMetadataView struct {

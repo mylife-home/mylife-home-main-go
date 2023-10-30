@@ -14,7 +14,7 @@ type ConstantFanMode struct {
 	Value definitions.State[string]
 }
 
-func (component *ConstantFanMode) Init() error {
+func (component *ConstantFanMode) Init(runtime definitions.Runtime) error {
 	component.Value.Set(component.ConfigValue)
 
 	return nil

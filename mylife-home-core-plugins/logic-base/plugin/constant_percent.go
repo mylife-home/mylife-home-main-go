@@ -13,7 +13,7 @@ type ConstantPercent struct {
 	Value definitions.State[int64]
 }
 
-func (component *ConstantPercent) Init() error {
+func (component *ConstantPercent) Init(runtime definitions.Runtime) error {
 	value := component.ConfigValue
 	if value < 0 {
 		value = 0

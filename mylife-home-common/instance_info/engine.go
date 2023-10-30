@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"mylife-home-common/defines"
+	"mylife-home-common/executor"
 	"mylife-home-common/log"
 	"mylife-home-common/tools"
 	"mylife-home-common/version"
@@ -24,12 +25,9 @@ var listeners = tools.NewCallbackManager[*InstanceInfo]()
 func Init() {
 	instanceInfo = create()
 
-	go func() {
-		for {
-			time.Sleep(time.Minute)
-			update(extractData(instanceInfo))
-		}
-	}()
+	executor.NewTicker(time.Minute, func() {
+		update(extractData(instanceInfo))
+	})
 }
 
 func Get() *InstanceInfo {

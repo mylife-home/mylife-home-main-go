@@ -23,7 +23,7 @@ type PartitionStatus struct {
 	cbhandle engine.StateCallbackHandle
 }
 
-func (component *PartitionStatus) Init() error {
+func (component *PartitionStatus) Init(runtime definitions.Runtime) error {
 	component.Value.Set(false)
 
 	component.state = engine.GetState(component.Key)

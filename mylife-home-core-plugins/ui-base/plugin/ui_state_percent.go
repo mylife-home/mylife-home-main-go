@@ -11,7 +11,7 @@ type UiStatePercent struct {
 	Value definitions.State[int64]
 }
 
-func (component *UiStatePercent) Init() error {
+func (component *UiStatePercent) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

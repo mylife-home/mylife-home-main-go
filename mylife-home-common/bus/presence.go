@@ -2,7 +2,6 @@ package bus
 
 import (
 	"mylife-home-common/tools"
-	"sync"
 
 	"golang.org/x/exp/maps"
 )
@@ -23,11 +22,10 @@ func (change *InstancePresenceChange) Online() bool {
 const presenceDomain = "online"
 
 type Presence struct {
-	client              *client
-	tracking            bool
-	onlineInstances     map[string]struct{}
-	onlineInstancesSync sync.RWMutex
-	onInstanceChange    *tools.CallbackManager[*InstancePresenceChange]
+	client           *client
+	tracking         bool
+	onlineInstances  map[string]struct{}
+	onInstanceChange *tools.CallbackManager[*InstancePresenceChange]
 }
 
 func newPresence(client *client, presenceTracking bool) *Presence {
@@ -42,7 +40,7 @@ func newPresence(client *client, presenceTracking bool) *Presence {
 		presence.client.OnOnlineChanged().Register(presence.onOnlineChange)
 		presence.client.OnMessage().Register(presence.onMessage)
 
-		presence.client.SubscribeNoWait("+/online")
+		presence.client.Subscribe("+/online")
 	}
 
 	return presence
@@ -57,17 +55,11 @@ func (presence *Presence) OnInstanceChange() tools.CallbackRegistration[*Instanc
 }
 
 func (presence *Presence) IsOnline(instanceName string) bool {
-	presence.onlineInstancesSync.RLock()
-	defer presence.onlineInstancesSync.RUnlock()
-
 	_, exists := presence.onlineInstances[instanceName]
 	return exists
 }
 
 func (presence *Presence) GetOnlines() []string {
-	presence.onlineInstancesSync.RLock()
-	defer presence.onlineInstancesSync.RUnlock()
-
 	return maps.Keys(presence.onlineInstances)
 }
 
@@ -97,9 +89,6 @@ func (presence *Presence) onMessage(m *message) {
 }
 
 func (presence *Presence) instanceChange(instanceName string, online bool) {
-	presence.onlineInstancesSync.Lock()
-	defer presence.onlineInstancesSync.Unlock()
-
 	_, exists := presence.onlineInstances[instanceName]
 	if online == exists {
 		return

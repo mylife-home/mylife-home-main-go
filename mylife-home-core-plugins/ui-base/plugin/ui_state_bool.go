@@ -11,7 +11,7 @@ type UiStateBool struct {
 	Value definitions.State[bool]
 }
 
-func (component *UiStateBool) Init() error {
+func (component *UiStateBool) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

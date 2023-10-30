@@ -27,7 +27,7 @@ type HueToRgb struct {
 	Brightness definitions.State[int64]
 }
 
-func (component *HueToRgb) Init() error {
+func (component *HueToRgb) Init(runtime definitions.Runtime) error {
 	component.compute()
 
 	return nil

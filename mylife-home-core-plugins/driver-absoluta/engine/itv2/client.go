@@ -46,6 +46,7 @@ type Client struct {
 	status                    ConnectionStatus
 	connectionStatusCallbacks []func(ConnectionStatus)
 	notificationsCallbacks    []func(commands.Command)
+	mux                       sync.Mutex // Synchronize external callback/status manipulations
 
 	ctx        context.Context
 	close      context.CancelFunc
@@ -81,6 +82,9 @@ func (client *Client) Close() {
 }
 
 func (client *Client) changeStatus(newStatus ConnectionStatus) {
+	client.mux.Lock()
+	defer client.mux.Unlock()
+
 	if client.status == newStatus {
 		return
 	}
@@ -93,14 +97,23 @@ func (client *Client) changeStatus(newStatus ConnectionStatus) {
 }
 
 func (client *Client) Status() ConnectionStatus {
+	client.mux.Lock()
+	defer client.mux.Unlock()
+
 	return client.status
 }
 
 func (client *Client) RegisterStatusChange(callback func(ConnectionStatus)) {
+	client.mux.Lock()
+	defer client.mux.Unlock()
+
 	client.connectionStatusCallbacks = append(client.connectionStatusCallbacks, callback)
 }
 
 func (client *Client) RegisterNotifications(callback func(commands.Command)) {
+	client.mux.Lock()
+	defer client.mux.Unlock()
+
 	client.notificationsCallbacks = append(client.notificationsCallbacks, callback)
 }
 
@@ -175,6 +188,9 @@ func (client *Client) processCommand(cmd commands.Command) {
 	if client.transactions.ProcessCommand(cmd) {
 		return
 	}
+
+	client.mux.Lock()
+	defer client.mux.Unlock()
 
 	// Not matched by transaction manager, consider it notification
 	for _, callback := range client.notificationsCallbacks {

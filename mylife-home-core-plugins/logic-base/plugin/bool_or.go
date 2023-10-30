@@ -15,7 +15,7 @@ type BoolOr struct {
 	Value definitions.State[bool]
 }
 
-func (component *BoolOr) Init() error {
+func (component *BoolOr) Init(runtime definitions.Runtime) error {
 	component.state = make([]bool, component.UsedCount)
 
 	return nil

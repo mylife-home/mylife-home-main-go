@@ -12,7 +12,7 @@ type SwitchToButton struct {
 	Value definitions.State[bool]
 }
 
-func (component *SwitchToButton) Init() error {
+func (component *SwitchToButton) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

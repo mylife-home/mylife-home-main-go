@@ -11,7 +11,7 @@ type ByteToPercent struct {
 	Value definitions.State[int64]
 }
 
-func (component *ByteToPercent) Init() error {
+func (component *ByteToPercent) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

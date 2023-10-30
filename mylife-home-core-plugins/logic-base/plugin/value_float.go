@@ -16,7 +16,7 @@ func (component *ValueFloat) SetValue(arg float64) {
 	component.Value.Set(arg)
 }
 
-func (component *ValueFloat) Init() error {
+func (component *ValueFloat) Init(runtime definitions.Runtime) error {
 	component.Value.Set(math.NaN())
 	return nil
 }

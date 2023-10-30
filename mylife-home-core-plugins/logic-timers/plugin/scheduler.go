@@ -32,7 +32,7 @@ type Scheduler struct {
 	cronJobId  cron.EntryID // 0 = no job
 }
 
-func (component *Scheduler) Init() error {
+func (component *Scheduler) Init(runtime definitions.Runtime) error {
 	component.Enabled.Set(true)
 
 	component.cronEngine = cron.New()

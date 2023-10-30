@@ -11,7 +11,7 @@ type TemperatureToFloat struct {
 	Value definitions.State[float64]
 }
 
-func (component *TemperatureToFloat) Init() error {
+func (component *TemperatureToFloat) Init(runtime definitions.Runtime) error {
 	return nil
 }
 

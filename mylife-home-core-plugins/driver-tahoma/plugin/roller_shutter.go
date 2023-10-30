@@ -33,7 +33,7 @@ type RollerShutter struct {
 	storeExecChangedToken   tools.RegistrationToken
 }
 
-func (component *RollerShutter) Init() error {
+func (component *RollerShutter) Init(runtime definitions.Runtime) error {
 	component.store = engine.GetStore(component.BoxKey)
 
 	component.storeOnlineChangedToken = component.store.OnOnlineChanged().Register(component.handleOnlineChanged)

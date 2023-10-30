@@ -1,12 +1,10 @@
 package components
 
 import (
-	"fmt"
 	"mylife-home-common/bus"
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/tools"
 	"strings"
-	"sync"
 
 	"golang.org/x/exp/maps"
 )
@@ -213,7 +211,6 @@ type busComponent struct {
 	id              string
 	plugin          *metadata.Plugin
 	state           map[string]any
-	stateLock       sync.RWMutex
 	onStateChange   *tools.CallbackManager[*StateChange]
 }
 
@@ -264,24 +261,14 @@ func (comp *busComponent) Plugin() *metadata.Plugin {
 }
 
 func (comp *busComponent) GetStateItem(name string) any {
-	comp.stateLock.RLock()
-	defer comp.stateLock.RUnlock()
-
 	return comp.state[name]
 }
 
 func (comp *busComponent) GetState() tools.ReadonlyMap[string, any] {
-	comp.stateLock.RLock()
-	defer comp.stateLock.RUnlock()
-
-	// need to provide a copy to keep stable
-	return tools.NewReadonlyMap[string, any](maps.Clone(comp.state))
+	return tools.NewReadonlyMap[string, any](comp.state)
 }
 
 func (comp *busComponent) stateChange(name string, data []byte) {
-	comp.stateLock.Lock()
-	defer comp.stateLock.Unlock()
-
 	member := comp.plugin.Member(name)
 	value := bus.Encoding.ReadValue(member.ValueType(), data)
 	comp.state[name] = value
@@ -294,7 +281,8 @@ func (comp *busComponent) stateChange(name string, data []byte) {
 func (comp *busComponent) ExecuteAction(name string, value any) {
 	member := comp.plugin.Member(name)
 	if member == nil || member.MemberType() != metadata.Action {
-		panic(fmt.Errorf("unknown action '%s' on component '%s' (plugin=%s:%s)", name, comp.id, comp.instanceName, comp.plugin.Id()))
+		logger.Errorf("unknown action '%s' on component '%s' (plugin=%s:%s)", name, comp.id, comp.instanceName, comp.plugin.Id())
+		return
 	}
 
 	data := bus.Encoding.WriteValue(member.ValueType(), value)

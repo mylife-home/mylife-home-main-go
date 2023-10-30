@@ -15,7 +15,7 @@ type BoolAnd struct {
 	Value definitions.State[bool]
 }
 
-func (component *BoolAnd) Init() error {
+func (component *BoolAnd) Init(runtime definitions.Runtime) error {
 	component.state = make([]bool, component.UsedCount)
 
 	component.Value.Set(true)
