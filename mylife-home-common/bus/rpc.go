@@ -174,10 +174,15 @@ func (svc *rpcServiceImpl[TInput, TOutput]) runAsync(payload []byte) {
 	var req request[TInput]
 	Encoding.ReadTypedJson(payload, &req)
 
+	// Need to create a dedicated executor in case we got shutdown while executing handler
+	exec := executor.CreateExecutor()
+
 	go func() {
+		defer exec.Terminate()
+
 		resp := svc.handle(&req)
 
-		executor.Execute(func() {
+		exec.Execute(func() {
 			output := Encoding.WriteJson(resp)
 			svc.client.PublishNoWait(req.ReplyTopic, output, false)
 		})
