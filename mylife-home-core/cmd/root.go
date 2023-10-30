@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"mylife-home-core/pkg/manager"
 	"mylife-home-core/pkg/plugins"
 	"mylife-home-core/pkg/version"
@@ -37,8 +36,6 @@ func run(_ *cobra.Command, _ []string) {
 	config.Init(configFile)
 	plugins.Build()
 
-	fmt.Printf("TOT\n")
-
 	executor.Run(
 		setupSignals,
 		instance_info.Init,
@@ -46,7 +43,6 @@ func run(_ *cobra.Command, _ []string) {
 }
 
 func setupSignals() {
-	fmt.Printf("setupSignals\n")
 	channel := make(chan os.Signal, 1)
 
 	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)
