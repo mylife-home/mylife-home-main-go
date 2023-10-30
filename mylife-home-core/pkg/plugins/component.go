@@ -4,6 +4,7 @@ import (
 	"context"
 	"mylife-home-common/components"
 	"mylife-home-common/components/metadata"
+	"mylife-home-common/executor"
 	"mylife-home-common/tools"
 	"mylife-home-core-library/definitions"
 	"sync"
@@ -71,7 +72,7 @@ func (comp *Component) ExecuteAction(actionName string, arg any) {
 
 // Called from component loop on state change
 func (comp *Component) stateChanged(stateName string, value any) {
-	tools.MainLoop.Execute(func() {
+	executor.Execute(func() {
 		comp.state[stateName] = value
 		comp.onStateChange.Execute(components.NewStateChange(stateName, value))
 	})

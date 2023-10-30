@@ -38,30 +38,30 @@ func MakeManager() (*Manager, error) {
 
 	manager.addPluginsInstanceInfo()
 
-	if err := manager.transport.Rpc().Serve("components.add", bus.NewRpcService(manager.rpcComponentAdd)); err != nil {
+	if err := manager.transport.Rpc().Serve("components.add", bus.NewRpcServiceSync(manager.rpcComponentAdd)); err != nil {
 		return manager, err
 	}
 
-	if err := manager.transport.Rpc().Serve("components.remove", bus.NewRpcService(manager.rpcComponentRemove)); err != nil {
+	if err := manager.transport.Rpc().Serve("components.remove", bus.NewRpcServiceSync(manager.rpcComponentRemove)); err != nil {
 		return manager, err
 	}
 
-	if err := manager.transport.Rpc().Serve("components.list", bus.NewRpcService(manager.rpcComponentList)); err != nil {
+	if err := manager.transport.Rpc().Serve("components.list", bus.NewRpcServiceSync(manager.rpcComponentList)); err != nil {
 		return manager, err
 	}
 
 	instance_info.AddCapability("components-api")
 
 	if manager.cm.SupportsBindings() {
-		if err := manager.transport.Rpc().Serve("bindings.add", bus.NewRpcService(manager.rpcBindingAdd)); err != nil {
+		if err := manager.transport.Rpc().Serve("bindings.add", bus.NewRpcServiceSync(manager.rpcBindingAdd)); err != nil {
 			return manager, err
 		}
 
-		if err := manager.transport.Rpc().Serve("bindings.remove", bus.NewRpcService(manager.rpcBindingRemove)); err != nil {
+		if err := manager.transport.Rpc().Serve("bindings.remove", bus.NewRpcServiceSync(manager.rpcBindingRemove)); err != nil {
 			return manager, err
 		}
 
-		if err := manager.transport.Rpc().Serve("bindings.list", bus.NewRpcService(manager.rpcBindingList)); err != nil {
+		if err := manager.transport.Rpc().Serve("bindings.list", bus.NewRpcServiceSync(manager.rpcBindingList)); err != nil {
 			return manager, err
 		}
 
