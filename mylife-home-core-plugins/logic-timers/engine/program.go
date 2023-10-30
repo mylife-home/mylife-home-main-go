@@ -155,9 +155,14 @@ func (program *Program[Value]) OnOutput() tools.CallbackRegistration[*OutputArg[
 
 // Can be runned from any goroutine
 func (program *Program[Value]) updateProgress(progressTime time.Duration) {
-	arg := &ProgressArg{percent: 0, progressTime: progressTime}
-	if program.totalTime != 0 && progressTime != 0 {
-		arg.percent = float64(progressTime.Milliseconds()) / float64(program.totalTime.Milliseconds()) * 100
+	if program.totalTime == 0 {
+		// do not emit progress on sync programs
+		return
+	}
+
+	arg := &ProgressArg{
+		percent:      float64(progressTime.Milliseconds()) / float64(program.totalTime.Milliseconds()) * 100,
+		progressTime: progressTime,
 	}
 
 	program.executor.Execute(func() {
@@ -174,8 +179,12 @@ func (program *Program[Value]) setRunning(value bool) {
 
 // Can be runned from any goroutine
 func (program *Program[Value]) setOutput(index int, value Value) {
-	program.onOutput.Execute(&OutputArg[Value]{
+	arg := &OutputArg[Value]{
 		index: index,
 		value: value,
+	}
+
+	program.executor.Execute(func() {
+		program.onOutput.Execute(arg)
 	})
 }
