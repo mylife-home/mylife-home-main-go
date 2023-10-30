@@ -21,5 +21,6 @@ func (component *UiButton) Terminate() {
 
 // @Action()
 func (component *UiButton) Action(arg bool) {
-	component.Value.Set(arg)
+	component.Value.Set(true)
+	component.Value.Set(false)
 }
