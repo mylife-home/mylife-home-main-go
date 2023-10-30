@@ -95,7 +95,7 @@ func NewProgram[Value any](executor definitions.Executor, parseOutputValue func(
 }
 
 func (program *Program[Value]) RunSync() {
-	panics.IsNil(program.running)
+	panics.IsTrue(program.running == nil)
 	run := newRun(program)
 	run.Execute()
 }
