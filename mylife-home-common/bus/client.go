@@ -81,6 +81,7 @@ func newClient(instanceName string) *client {
 	options.SetConnectRetry(true)
 	options.SetMaxReconnectInterval(time.Second * 5)
 	options.SetConnectRetryInterval(time.Second * 5)
+	options.SetOrderMatters(false)
 
 	options.SetBinaryWill(client.BuildTopic(presenceDomain), []byte{}, 0, true)
 
@@ -154,8 +155,7 @@ func (client *client) Terminate() {
 	if client.mqtt.IsConnected() {
 		client.ClearRetain(client.BuildTopic(presenceDomain))
 
-		// TODO: should we go async?
-		client.clearResidentState()
+		client.clearResidentState(false)
 	}
 
 	client.mqtt.Disconnect(100)
@@ -181,8 +181,7 @@ func (client *client) onConnect() {
 	// given the spec, it is unclear if LWT should be executed in case of client takeover, so we run it to be sure
 	client.ClearRetain(client.BuildTopic(presenceDomain))
 
-	// TODO: should we go async?
-	client.clearResidentState()
+	client.clearResidentState(true)
 
 	client.Publish(client.BuildTopic(presenceDomain), Encoding.WriteBool(true), true)
 
@@ -222,7 +221,9 @@ func (client *client) Online() bool {
 	return client.online
 }
 
-func (client *client) clearResidentState() {
+func (client *client) clearResidentState(checkExit bool) {
+	// TODO: should we go async?
+
 	// register on self state, and remove on every message received
 	// wait 1 sec after last message receive
 
@@ -239,7 +240,14 @@ func (client *client) clearResidentState() {
 	selfStateTopic := client.BuildTopic("#")
 
 	client.goToken(client.mqtt.Subscribe(selfStateTopic, 0, clearTopic))
-	defer client.goToken(client.mqtt.Unsubscribe(selfStateTopic))
+	defer func() {
+		client.goToken(client.mqtt.Unsubscribe(selfStateTopic))
+	}()
+
+	var exitChan <-chan struct{}
+	if checkExit {
+		exitChan = client.ctx.Done()
+	}
 
 	for {
 		select {
@@ -250,7 +258,7 @@ func (client *client) clearResidentState() {
 			// timeout, exit
 			return
 
-		case <-client.ctx.Done():
+		case <-exitChan:
 			// client exiting, exit
 			return
 		}
