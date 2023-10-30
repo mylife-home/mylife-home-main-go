@@ -115,6 +115,7 @@ type rpcServiceImpl[TInput any, TOutput any] struct {
 	msgToken       tools.RegistrationToken
 }
 
+// Note: Implementation is executed in its own goroutine. You may want to run MainLoop.Execute() to synchronize.
 func NewRpcService[TInput any, TOutput any](implementation func(TInput) (TOutput, error)) RpcService {
 	return &rpcServiceImpl[TInput, TOutput]{
 		implementation: implementation,
@@ -140,12 +141,16 @@ func (svc *rpcServiceImpl[TInput, TOutput]) onMessage(m *message) {
 		return
 	}
 
+	var req request[TInput]
+	Encoding.ReadTypedJson(m.Payload(), &req)
+
 	go func() {
-		var req request[TInput]
-		Encoding.ReadTypedJson(m.Payload(), &req)
 		resp := svc.handle(&req)
-		output := Encoding.WriteJson(resp)
-		svc.client.PublishNoWait(req.ReplyTopic, output, false)
+
+		tools.MainLoop.Execute(func() {
+			output := Encoding.WriteJson(resp)
+			svc.client.PublishNoWait(req.ReplyTopic, output, false)
+		})
 	}()
 }
 
