@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"fmt"
+	"math"
 	"mylife-home-core-library/definitions"
 	"mylife-home-core-plugins-logic-timers/engine"
 	"strconv"
@@ -151,7 +152,7 @@ func (component *SmartTimerPercent) clear() {
 }
 
 func (component *SmartTimerPercent) onProgress(arg *engine.ProgressArg) {
-	component.Progress.Set(int64(arg.Percent()))
+	component.Progress.Set(int64(math.Round(arg.Percent())))
 	component.ProgressTime.Set(arg.ProgressTime().Seconds())
 }
 
