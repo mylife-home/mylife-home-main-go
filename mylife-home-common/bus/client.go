@@ -159,6 +159,7 @@ func (client *client) Terminate() {
 	}
 
 	client.mqtt.Disconnect(100)
+	client.exec.Terminate()
 }
 
 func (client *client) InstanceName() string {
