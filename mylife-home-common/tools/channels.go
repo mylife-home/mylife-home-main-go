@@ -7,6 +7,9 @@ type ChannelMerger[T any] struct {
 	wg  sync.WaitGroup
 }
 
+// Merge several channels into one.
+// The output channel is closed when all input channels are closed.
+// It allows to add input channels during its lifetime.
 func MakeChannelMerger[T any](initialChan <-chan T) *ChannelMerger[T] {
 	m := &ChannelMerger[T]{
 		out: make(chan T),
@@ -44,6 +47,7 @@ func (m *ChannelMerger[T]) Out() <-chan T {
 	return m.out
 }
 
+// Create an infinite-buffered channel
 func BufferedChannel[T any]() (chan<- T, <-chan T) {
 	in := make(chan T)
 	out := make(chan T)
@@ -90,6 +94,7 @@ func BufferedChannel[T any]() (chan<- T, <-chan T) {
 	return in, out
 }
 
+// Connect one channel to another, with a mapper function between
 func MapChannel[TIn any, TOut any](in <-chan TIn, out chan<- TOut, mapper func(in TIn) TOut) {
 	go func() {
 		defer close(out)
@@ -100,6 +105,7 @@ func MapChannel[TIn any, TOut any](in <-chan TIn, out chan<- TOut, mapper func(i
 	}()
 }
 
+// Connect one channel to another
 func PipeChannel[T any](in <-chan T, out chan<- T) {
 	go func() {
 		defer close(out)
@@ -108,4 +114,10 @@ func PipeChannel[T any](in <-chan T, out chan<- T) {
 			out <- vin
 		}
 	}()
+}
+
+// Read channel and ignore output until it has been closed
+func DrainChannel[T any](in <-chan T) {
+	for range in {
+	}
 }
