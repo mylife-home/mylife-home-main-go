@@ -244,6 +244,10 @@ func (client *client) Subscribe(topic string, callback func(m *message)) error {
 }
 
 func (client *client) Unsubscribe(topics ...string) error {
+	if !client.mqtt.IsConnectionOpen() {
+		return nil
+	}
+
 	return client.wait(client.mqtt.Unsubscribe(topics...))
 }
 
