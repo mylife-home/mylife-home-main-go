@@ -95,7 +95,9 @@ func BufferedChannel[T any]() (chan<- T, <-chan T) {
 }
 
 // Connect one channel to another, with a mapper function between
-func MapChannel[TIn any, TOut any](in <-chan TIn, out chan<- TOut, mapper func(in TIn) TOut) {
+func MapChannel[TIn any, TOut any](in <-chan TIn, mapper func(in TIn) TOut) <-chan TOut {
+	out := make(chan TOut)
+
 	go func() {
 		defer close(out)
 
@@ -103,6 +105,25 @@ func MapChannel[TIn any, TOut any](in <-chan TIn, out chan<- TOut, mapper func(i
 			out <- mapper(vin)
 		}
 	}()
+
+	return out
+}
+
+// Connect one channel to another, and only transmit values that pass the filter
+func FilterChannel[T any](in <-chan T, filter func(in T) bool) <-chan T {
+	out := make(chan T)
+
+	go func() {
+		defer close(out)
+
+		for vin := range in {
+			if filter(vin) {
+				out <- vin
+			}
+		}
+	}()
+
+	return out
 }
 
 // Connect one channel to another

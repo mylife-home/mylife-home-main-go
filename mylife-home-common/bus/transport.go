@@ -31,35 +31,71 @@ type Transport struct {
 	components *Components
 	metadata   *Metadata
 	logger     *Logger
+
+	onlineChan             chan bool
+	instanceInfoUpdateChan chan *instance_info.InstanceInfo
 }
 
 func NewTransport(options *Options) *Transport {
 	client := newClient(defines.InstanceName())
 	transport := &Transport{
-		client:     client,
-		rpc:        newRpc(client),
-		presence:   newPresence(client, options.presenceTracking),
-		components: newComponents(client),
-		metadata:   newMetadata(client),
-		logger:     newLogger(client),
+		client:                 client,
+		rpc:                    newRpc(client),
+		presence:               newPresence(client, options.presenceTracking),
+		components:             newComponents(client),
+		metadata:               newMetadata(client),
+		logger:                 newLogger(client),
+		onlineChan:             make(chan bool, 10),
+		instanceInfoUpdateChan: make(chan *instance_info.InstanceInfo, 10),
 	}
 
-	transport.client.OnOnlineChanged().Register(func(online bool) {
-		if online {
-			transport.publishInstanceInfo()
-		}
-	})
+	go transport.publishWorker()
 
-	instance_info.OnUpdate().Register(func(_ *instance_info.InstanceInfo) {
-		if transport.Online() {
-			transport.publishInstanceInfo()
-		}
-	})
+	transport.client.online.Subscribe(transport.onlineChan)
+	instance_info.OnUpdate().Subscribe(transport.instanceInfoUpdateChan)
 
 	return transport
 }
 
+func (transport *Transport) publishWorker() {
+	for {
+		var instanceInfo *instance_info.InstanceInfo
+
+		select {
+		case online, ok := <-transport.onlineChan:
+			if !ok {
+				return // closing
+			}
+
+			if online {
+				instanceInfo = instance_info.Get()
+			}
+
+		case data, ok := <-transport.instanceInfoUpdateChan:
+			if !ok {
+				return // closing
+			}
+
+			if transport.client.Online().Get() {
+				instanceInfo = data
+			}
+		}
+
+		switch err := transport.metadata.Set("instance-info", instanceInfo); {
+		case err == nil, err == errClosing:
+			// OK
+		default:
+			logger.WithError(err).Error("could not publish instance info")
+		}
+	}
+}
+
 func (transport *Transport) Terminate() {
+	transport.client.online.Unsubscribe(transport.onlineChan)
+	instance_info.OnUpdate().Unsubscribe(transport.instanceInfoUpdateChan)
+	close(transport.onlineChan)
+	close(transport.instanceInfoUpdateChan)
+
 	transport.client.Terminate()
 }
 
@@ -83,15 +119,6 @@ func (transport *Transport) Logger() *Logger {
 	return transport.logger
 }
 
-func (transport *Transport) OnOnlineChanged() tools.CallbackRegistration[bool] {
-	return transport.client.OnOnlineChanged()
-}
-
-func (transport *Transport) Online() bool {
+func (transport *Transport) Online() tools.ObservableValue[bool] {
 	return transport.client.Online()
-}
-
-func (transport *Transport) publishInstanceInfo() {
-	data := instance_info.Get()
-	transport.metadata.Set("instance-info", data)
 }
