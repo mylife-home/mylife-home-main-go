@@ -128,7 +128,6 @@ func (transport *Transport) Presence() *Presence {
 	return transport.presence
 }
 
-// TODO
 func (transport *Transport) Components() *Components {
 	return transport.components
 }
