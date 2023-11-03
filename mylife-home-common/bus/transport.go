@@ -48,7 +48,7 @@ func NewTransport() *Transport {
 
 func (transport *Transport) Terminate() {
 	wg := sync.WaitGroup{}
-	wg.Add(3)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
@@ -66,6 +66,11 @@ func (transport *Transport) Terminate() {
 	go func() {
 		defer wg.Done()
 		transport.rpc.terminate()
+	}()
+
+	go func() {
+		defer wg.Done()
+		transport.logger.terminate()
 	}()
 
 	wg.Wait()
@@ -130,11 +135,6 @@ func (transport *Transport) Components() *Components {
 
 func (transport *Transport) Metadata() *Metadata {
 	return transport.metadata
-}
-
-// TODO
-func (transport *Transport) Logger() *Logger {
-	return transport.logger
 }
 
 func (transport *Transport) Online() tools.ObservableValue[bool] {
