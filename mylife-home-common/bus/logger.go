@@ -50,6 +50,7 @@ func (logger *Logger) pump() {
 		for !enqueued {
 			select {
 			case logger.queue <- entry:
+				enqueued = true
 
 			default:
 				// Note: should log it, but it would cause more entries
