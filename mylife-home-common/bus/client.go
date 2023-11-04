@@ -156,7 +156,7 @@ func (client *client) clearResidentState() error {
 	onTopic := func(m *message) {
 		// only clear real retained messages
 		if m.Retained() && len(m.Payload()) > 0 && m.InstanceName() == client.instanceName {
-			topicQueue <- m.Path()
+			topicQueue <- m.Topic()
 		}
 	}
 
