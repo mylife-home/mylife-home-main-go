@@ -28,6 +28,7 @@ func newRpc(client *client) *Rpc {
 		onlineChan: make(chan bool),
 	}
 
+	go rpc.worker()
 	rpc.client.Online().Subscribe(rpc.onlineChan)
 
 	return rpc

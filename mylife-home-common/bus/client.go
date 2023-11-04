@@ -1,7 +1,6 @@
 package bus
 
 import (
-	"context"
 	"errors"
 	"mylife-home-common/config"
 	"mylife-home-common/tools"
@@ -56,10 +55,7 @@ func (m *message) Retained() bool {
 type client struct {
 	instanceName string
 	mqtt         mqtt.Client
-	ctx          context.Context // canceled on terminate
-	ctxClose     func()
-
-	online tools.SubjectValue[bool]
+	online       tools.SubjectValue[bool]
 }
 
 func newClient(instanceName string) *client {
@@ -160,6 +156,8 @@ func (client *client) clearResidentState() error {
 	for !exitLoop {
 		select {
 		case topic := <-topicQueue:
+			logger.Debugf("Clear resident state: '%s'", topic)
+
 			// reset timer on new topic + actually clear it
 			errg.Go(func() error {
 				return client.ClearRetain(topic)
@@ -168,10 +166,6 @@ func (client *client) clearResidentState() error {
 		case <-time.After(time.Second):
 			// timeout, exit
 			exitLoop = true
-
-		case <-client.ctx.Done():
-			// client exiting, exit
-			return client.ctx.Err()
 		}
 	}
 
