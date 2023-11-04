@@ -104,7 +104,9 @@ func newClient(instanceName string) *client {
 
 func (client *client) Terminate() {
 	if client.mqtt.IsConnectionOpen() {
-		client.ClearRetain(client.BuildTopic(presenceDomain))
+		if err := client.ClearRetain(client.BuildTopic(presenceDomain)); err != nil {
+			logger.WithError(err).Errorf("Error clearing presence")
+		}
 
 		if err := client.clearResidentState(); err != nil {
 			logger.WithError(err).Errorf("Error cleaning resident state")
@@ -121,11 +123,26 @@ func (client *client) InstanceName() string {
 func (client *client) onConnect() {
 	go func() {
 		if err := client.clearResidentState(); err != nil {
+			if !client.mqtt.IsConnectionOpen() {
+				return
+			}
+
 			logger.WithError(err).Errorf("Error cleaning resident state")
 			return
 			// TODO: should we retry?
 		}
 
+		if err := client.PublishRetain(client.BuildTopic(presenceDomain), Encoding.WriteBool(true)); err != nil {
+			if !client.mqtt.IsConnectionOpen() {
+				return
+			}
+
+			logger.WithError(err).Errorf("Error cleaning resident state")
+			return
+			// TODO: should we retry?
+		}
+
+		logger.Info("Connection established")
 		client.online.Update(true)
 	}()
 }
