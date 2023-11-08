@@ -5,33 +5,10 @@ import (
 	"mylife-home-common/tools"
 )
 
-type StateChange struct {
-	name  string
-	value any
-}
-
-func NewStateChange(name string, value any) *StateChange {
-	return &StateChange{
-		name:  name,
-		value: value,
-	}
-}
-
-func (change *StateChange) Name() string {
-	return change.name
-}
-
-func (change *StateChange) Value() any {
-	return change.value
-}
-
 type Component interface {
-	OnStateChange() tools.CallbackRegistration[*StateChange]
-
 	Id() string
 	Plugin() *metadata.Plugin
 
-	ExecuteAction(name string, value any)
-	GetStateItem(name string) any
-	GetState() tools.ReadonlyMap[string, any]
+	StateItem(name string) tools.ObservableValue[any]
+	Action(name string) chan<- any
 }
