@@ -16,7 +16,7 @@ const RpcTimeout = time.Second * 2
 
 type Rpc struct {
 	client     *client
-	services   map[string]RpcService // TODO: on connect bind all
+	services   map[string]RpcService
 	mux        sync.RWMutex
 	onlineChan chan bool
 }
@@ -45,6 +45,7 @@ func (rpc *Rpc) terminate() {
 	wg.Add(len(rpc.services))
 
 	for address, svc := range rpc.services {
+		address, svc := address, svc
 		go func() {
 			defer wg.Done()
 			if err := svc.unbind(); err != nil {
@@ -73,9 +74,10 @@ func (rpc *Rpc) rebind() {
 	wg.Add(len(rpc.services))
 
 	for address, svc := range rpc.services {
+		address, svc := address, svc
 		go func() {
 			defer wg.Done()
-			if err := svc.rebind(); err != nil {
+			if err := svc.bind(); err != nil {
 				logger.WithError(err).Errorf("Could not rebind service '%s'", address)
 			}
 		}()
@@ -83,41 +85,48 @@ func (rpc *Rpc) rebind() {
 }
 
 type RpcService interface {
-	bind(client *client, address string) error
-	rebind() error
+	setup(client *client, address string)
+	bind() error
 	unbind() error
 }
 
-func (rpc *Rpc) Serve(address string, svc RpcService) error {
+func (rpc *Rpc) Serve(address string, svc RpcService) {
+	rpc.mux.Lock()
+	defer rpc.mux.Unlock()
+
 	_, exists := rpc.services[address]
 	if exists {
 		panic(fmt.Errorf("service with address '%s' does already exist", address))
 	}
 
-	if err := svc.bind(rpc.client, address); err != nil {
-		return err
-	}
-
-	rpc.mux.Lock()
-	defer rpc.mux.Unlock()
+	svc.setup(rpc.client, address)
 	rpc.services[address] = svc
 
-	return nil
+	go func() {
+		if rpc.client.Online().Get() {
+			if err := svc.bind(); err != nil {
+				logger.WithError(err).Errorf("Could not bind service '%s'", address)
+			}
+		}
+	}()
 }
 
 func (rpc *Rpc) Unserve(address string) {
+	rpc.mux.Lock()
+	defer rpc.mux.Unlock()
+
 	svc, exists := rpc.services[address]
 	if !exists {
 		panic(fmt.Errorf("service with address '%s' does not exist", address))
 	}
 
-	if err := svc.unbind(); err != nil {
-		logger.WithError(err).Errorf("Could not unbind service '%s'", address)
-	}
-
-	rpc.mux.Lock()
-	defer rpc.mux.Unlock()
 	delete(rpc.services, address)
+
+	go func() {
+		if err := svc.unbind(); err != nil {
+			logger.WithError(err).Errorf("Could not unbind service '%s'", address)
+		}
+	}()
 }
 
 // Cannot use member function because of generic
@@ -190,7 +199,6 @@ type rpcServiceImpl[TInput any, TOutput any] struct {
 	client         *client
 	address        string
 	implementation func(TInput) (TOutput, error)
-	msgToken       tools.RegistrationToken
 }
 
 func NewRpcService[TInput any, TOutput any](implementation func(TInput) (TOutput, error)) RpcService {
@@ -199,14 +207,12 @@ func NewRpcService[TInput any, TOutput any](implementation func(TInput) (TOutput
 	}
 }
 
-func (svc *rpcServiceImpl[TInput, TOutput]) bind(client *client, address string) error {
+func (svc *rpcServiceImpl[TInput, TOutput]) setup(client *client, address string) {
 	svc.client = client
 	svc.address = address
-
-	return svc.rebind()
 }
 
-func (svc *rpcServiceImpl[TInput, TOutput]) rebind() error {
+func (svc *rpcServiceImpl[TInput, TOutput]) bind() error {
 	return svc.client.Subscribe(svc.buildTopic(), svc.handleMessage)
 }
 
