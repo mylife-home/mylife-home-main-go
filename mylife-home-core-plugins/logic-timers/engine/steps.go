@@ -69,7 +69,7 @@ func (s *waitStep) Execute(run *runningData) {
 		select {
 		case <-time.After(sleep):
 
-		case <-run.ctx.Done():
+		case <-run.interrupted():
 			logger.Debug("WaitStep interrupted")
 			return
 		}

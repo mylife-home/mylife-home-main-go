@@ -75,11 +75,6 @@ type SmartTimerBinary struct {
 	run            *runData
 }
 
-type runData struct {
-	cancel func()
-	exit   chan struct{}
-}
-
 func (component *SmartTimerBinary) Init(runtime definitions.Runtime) error {
 
 	component.TotalTime.Set(0)

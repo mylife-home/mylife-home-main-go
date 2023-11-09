@@ -1,11 +1,13 @@
 package plugin
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"mylife-home-core-library/definitions"
 	"mylife-home-core-plugins-logic-timers/engine"
 	"strconv"
+	"sync"
 )
 
 // @Plugin(usage="logic")
@@ -62,15 +64,19 @@ type SmartTimerPercent struct {
 	// @State(type="range[0;100]")
 	Output9 definitions.State[int64]
 
-	executor       definitions.Executor
 	initProgram    *engine.Program[int64]
 	triggerProgram *engine.Program[int64]
 	cancelProgram  *engine.Program[int64]
 	outputs        []definitions.State[int64] // easily address output
+	onProgressChan chan *engine.ProgressArg
+	onRunningChan  chan bool
+	onOutputChan   chan *engine.OutputArg[int64]
+	pumpExited     chan struct{}
+	runMux         sync.Mutex
+	run            *runData
 }
 
 func (component *SmartTimerPercent) Init(runtime definitions.Runtime) error {
-	component.executor = runtime.NewExecutor()
 
 	component.TotalTime.Set(0)
 	component.ProgressTime.Set(0)
@@ -89,29 +95,74 @@ func (component *SmartTimerPercent) Init(runtime definitions.Runtime) error {
 		component.Output9,
 	}
 
-	component.initProgram = engine.NewProgram[int64](component.executor, component.parseOutputValue, component.ConfigInitProgram, false)
-	component.triggerProgram = engine.NewProgram[int64](component.executor, component.parseOutputValue, component.ConfigTriggerProgram, true)
-	component.cancelProgram = engine.NewProgram[int64](component.executor, component.parseOutputValue, component.ConfigCancelProgram, false)
+	component.initProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigInitProgram, false)
+	component.triggerProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigTriggerProgram, true)
+	component.cancelProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigCancelProgram, false)
 
-	component.triggerProgram.OnProgress().Register(component.onProgress)
-	component.triggerProgram.OnRunning().Register(component.onRunning)
-	component.initProgram.OnOutput().Register(component.onOutput)
-	component.triggerProgram.OnOutput().Register(component.onOutput)
-	component.cancelProgram.OnOutput().Register(component.onOutput)
+	component.pumpExited = make(chan struct{})
+	go component.pump()
+
+	component.triggerProgram.OnProgress().Subscribe(component.onProgressChan)
+	component.triggerProgram.OnRunning().Subscribe(component.onRunningChan, false)
+	component.initProgram.OnOutput().Subscribe(component.onOutputChan)
+	component.triggerProgram.OnOutput().Subscribe(component.onOutputChan)
+	component.cancelProgram.OnOutput().Subscribe(component.onOutputChan)
 
 	component.TotalTime.Set(component.triggerProgram.TotalTime().Seconds())
 
-	component.initProgram.RunSync()
+	component.initProgram.Run(context.Background())
 
 	return nil
 }
 
 func (component *SmartTimerPercent) Terminate() {
-	if component.triggerProgram.Running() {
-		component.triggerProgram.Interrupt()
-	}
+	component.runMux.Lock()
+	component.clear()
+	component.runMux.Unlock()
 
-	component.executor.Terminate()
+	component.triggerProgram.OnProgress().Unsubscribe(component.onProgressChan)
+	component.triggerProgram.OnRunning().Unsubscribe(component.onRunningChan)
+	component.initProgram.OnOutput().Unsubscribe(component.onOutputChan)
+	component.triggerProgram.OnOutput().Unsubscribe(component.onOutputChan)
+	component.cancelProgram.OnOutput().Unsubscribe(component.onOutputChan)
+	<-component.pumpExited
+}
+
+func (component *SmartTimerPercent) pump() {
+	defer close(component.pumpExited)
+
+	onProgressChan := component.onProgressChan
+	onRunningChan := component.onRunningChan
+	onOutputChan := component.onOutputChan
+
+	for onProgressChan != nil || onRunningChan != nil || onOutputChan != nil {
+		select {
+		case progress, ok := <-onProgressChan:
+			if !ok {
+				onProgressChan = nil
+				continue
+			}
+
+			component.Progress.Set(int64(math.Round(progress.Percent())))
+			component.ProgressTime.Set(progress.ProgressTime().Seconds())
+
+		case running, ok := <-onRunningChan:
+			if !ok {
+				onRunningChan = nil
+				continue
+			}
+
+			component.Running.Set(running)
+
+		case output, ok := <-onOutputChan:
+			if !ok {
+				onOutputChan = nil
+				continue
+			}
+
+			component.outputs[output.Index()].Set(output.Value())
+		}
+	}
 }
 
 // @Action
@@ -120,8 +171,11 @@ func (component *SmartTimerPercent) Trigger(arg bool) {
 		return
 	}
 
+	component.runMux.Lock()
+	defer component.runMux.Unlock()
+
 	component.clear()
-	component.triggerProgram.Start()
+	component.start()
 }
 
 // @Action
@@ -129,6 +183,9 @@ func (component *SmartTimerPercent) Cancel(arg bool) {
 	if !arg {
 		return
 	}
+
+	component.runMux.Lock()
+	defer component.runMux.Unlock()
 
 	component.clear()
 }
@@ -139,31 +196,62 @@ func (component *SmartTimerPercent) Toggle(arg bool) {
 		return
 	}
 
-	if component.triggerProgram.Running() {
+	component.runMux.Lock()
+	defer component.runMux.Unlock()
+
+	if component.run != nil {
 		component.clear()
 	} else {
-		component.triggerProgram.Start()
+		component.start()
 	}
 }
 
+// Call inside the lock
+func (component *SmartTimerPercent) start() {
+	ctx, cancel := context.WithCancel(context.Background())
+	exit := make(chan struct{})
+
+	go component.entry(ctx, exit)
+
+	component.run = &runData{
+		cancel: cancel,
+		exit:   exit,
+	}
+}
+
+// Call inside the lock
 func (component *SmartTimerPercent) clear() {
-	if component.triggerProgram.Running() {
-		component.triggerProgram.Interrupt()
-		component.cancelProgram.RunSync()
+	run := component.run
+	if run == nil {
+		return
+	}
+
+	run.cancel()
+	<-run.exit
+
+	// Each lock wants to clear run if started
+	// This means we can set to nil only if no lock is currently taken
+	// Which means nobody is trying to clear us (in which case it will
+	// set itself component.run to nil)
+	if component.runMux.TryLock() {
+		component.run = nil
+		component.runMux.Unlock()
 	}
 }
 
-func (component *SmartTimerPercent) onProgress(arg *engine.ProgressArg) {
-	component.Progress.Set(int64(math.Round(arg.Percent())))
-	component.ProgressTime.Set(arg.ProgressTime().Seconds())
-}
+func (component *SmartTimerPercent) entry(ctx context.Context, exit chan<- struct{}) {
+	defer close(exit)
 
-func (component *SmartTimerPercent) onRunning(value bool) {
-	component.Running.Set(value)
-}
+	ret := component.triggerProgram.Run(ctx)
 
-func (component *SmartTimerPercent) onOutput(arg *engine.OutputArg[int64]) {
-	component.outputs[arg.Index()].Set(arg.Value())
+	// interrupted
+	if !ret {
+		component.cancelProgram.Run(context.Background())
+	}
+
+	// set run as nil
+	// FIXME: lock !?
+	component.run = nil
 }
 
 func (component *SmartTimerPercent) parseOutputValue(arg string) (int64, error) {
