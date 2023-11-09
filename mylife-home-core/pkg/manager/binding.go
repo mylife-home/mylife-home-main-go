@@ -10,7 +10,7 @@ import (
 )
 
 type binding struct {
-	registry             *components.Registry
+	registry             components.Registry
 	config               *store.BindingConfig
 	source               *bindingComponent
 	target               *bindingComponent
@@ -19,7 +19,7 @@ type binding struct {
 	componentChangeToken tools.RegistrationToken
 }
 
-func makeBinding(registry *components.Registry, config *store.BindingConfig) *binding {
+func makeBinding(registry components.Registry, config *store.BindingConfig) *binding {
 	b := &binding{
 		registry: registry,
 		config:   config,
