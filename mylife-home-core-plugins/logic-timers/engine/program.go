@@ -1,12 +1,10 @@
 package engine
 
 import (
+	"context"
 	"mylife-home-common/log"
 	"mylife-home-common/tools"
-	"mylife-home-core-library/definitions"
 	"time"
-
-	"github.com/gookit/goutil/errorx/panics"
 )
 
 var logger = log.CreateLogger("mylife:home:core:plugins:logic-timers:engine")
@@ -50,20 +48,17 @@ type Program[Value any] struct {
 	// readonly after setup
 	steps     []step
 	totalTime time.Duration
-	executor  definitions.Executor
 
-	onProgress *tools.CallbackManager[*ProgressArg]
-	onRunning  *tools.CallbackManager[bool]
-	onOutput   *tools.CallbackManager[*OutputArg[Value]]
-	running    *runningData
+	onProgress tools.Subject[*ProgressArg]
+	onRunning  tools.SubjectValue[bool]
+	onOutput   tools.Subject[*OutputArg[Value]]
 }
 
-func NewProgram[Value any](executor definitions.Executor, parseOutputValue func(value string) (Value, error), source string, canWait bool) *Program[Value] {
+func NewProgram[Value any](parseOutputValue func(value string) (Value, error), source string, canWait bool) *Program[Value] {
 	program := &Program[Value]{
-		executor:   executor,
-		onProgress: tools.NewCallbackManager[*ProgressArg](),
-		onRunning:  tools.NewCallbackManager[bool](),
-		onOutput:   tools.NewCallbackManager[*OutputArg[Value]](),
+		onProgress: tools.MakeSubject[*ProgressArg](),
+		onRunning:  tools.MakeSubjectValue[bool](false),
+		onOutput:   tools.MakeSubject[*OutputArg[Value]](),
 	}
 
 	parser := ProgramParser[Value]{
@@ -94,97 +89,59 @@ func NewProgram[Value any](executor definitions.Executor, parseOutputValue func(
 	return program
 }
 
-func (program *Program[Value]) RunSync() {
-	panics.IsTrue(program.running == nil)
-	run := newRun(program)
-	run.Execute()
-}
-
-func (program *Program[Value]) Start() {
-	program.ensureStopped()
-
-	run := newRun(program)
-	run.Start()
-	program.running = run
-}
-
-func (program *Program[Value]) Interrupt() {
-	program.ensureStopped()
-}
-
-func (program *Program[Value]) ensureStopped() {
-	if program.running == nil {
-		return
-	}
-
-	program.running.Stop()
-	program.running = nil
-}
-
-func (program *Program[Value]) Terminate() {
-	program.ensureStopped()
-}
-
-func (program *Program[Value]) Running() bool {
-	return program.running != nil
-}
-
 func (program *Program[Value]) TotalTime() time.Duration {
 	return program.totalTime
 }
 
-// Called from different goroutine
-func (program *Program[Value]) executeEnd(run *runningData) {
-	program.executor.Execute(func() {
-		panics.IsTrue(program.running == nil || program.running == run)
-		program.running = nil
-	})
-}
-
-func (program *Program[Value]) OnProgress() tools.CallbackRegistration[*ProgressArg] {
+func (program *Program[Value]) OnProgress() tools.Observable[*ProgressArg] {
 	return program.onProgress
 }
 
-func (program *Program[Value]) OnRunning() tools.CallbackRegistration[bool] {
+func (program *Program[Value]) OnRunning() tools.ObservableValue[bool] {
 	return program.onRunning
 }
 
-func (program *Program[Value]) OnOutput() tools.CallbackRegistration[*OutputArg[Value]] {
+func (program *Program[Value]) OnOutput() tools.Observable[*OutputArg[Value]] {
 	return program.onOutput
 }
 
-// Can be runned from any goroutine
+// true if run to the end, false if interrupted
+// Note: start  several runs concurrently may end up with Observables mismatches
+func (program *Program[Value]) Run(exit context.Context) bool {
+	program.onRunning.Update(true)
+	defer program.onRunning.Update(false)
+	defer program.updateProgress(0)
+
+	run := newRunningData(program)
+
+	for _, step := range program.steps {
+		step.Execute(run)
+
+		if exit.Err() != nil {
+			return false
+		}
+	}
+
+	return true
+
+}
+
 func (program *Program[Value]) updateProgress(progressTime time.Duration) {
 	if program.totalTime == 0 {
 		// do not emit progress on sync programs
 		return
 	}
 
-	arg := &ProgressArg{
+	program.onProgress.Notify(&ProgressArg{
 		percent:      float64(progressTime.Milliseconds()) / float64(program.totalTime.Milliseconds()) * 100,
 		progressTime: progressTime,
-	}
-
-	program.executor.Execute(func() {
-		program.onProgress.Execute(arg)
-	})
-}
-
-// Can be runned from any goroutine
-func (program *Program[Value]) setRunning(value bool) {
-	program.executor.Execute(func() {
-		program.onRunning.Execute(value)
 	})
 }
 
 // Can be runned from any goroutine
 func (program *Program[Value]) setOutput(index int, value Value) {
-	arg := &OutputArg[Value]{
+	program.onOutput.Notify(&OutputArg[Value]{
 		index: index,
 		value: value,
-	}
-
-	program.executor.Execute(func() {
-		program.onOutput.Execute(arg)
 	})
 }
