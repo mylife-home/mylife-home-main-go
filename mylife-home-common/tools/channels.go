@@ -142,3 +142,12 @@ func DrainChannel[T any](in <-chan T) {
 	for range in {
 	}
 }
+
+// Listen to a channel and synchronously execute a function for each message
+func DispatchChannel[T any](in <-chan T, callback func(in T)) {
+	go func() {
+		for vin := range in {
+			callback(vin)
+		}
+	}()
+}
