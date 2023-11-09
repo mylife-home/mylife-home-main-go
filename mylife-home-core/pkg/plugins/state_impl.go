@@ -31,6 +31,8 @@ func (state *stateImpl[T]) Value() tools.ObservableValue[any] {
 }
 
 func (state *stateImpl[T]) init() {
+	// Note: the default value may be invalid but we should change it at init,
+	// before anything should start to observe
 	var defaultValue T
 	state.value = tools.MakeSubjectValue[any](defaultValue)
 }
