@@ -145,7 +145,7 @@ func (reg *registry) AddPlugin(instanceName string, plugin *metadata.Plugin) {
 		data.plugins[id] = plugin
 	})
 
-	logger.Debugf("Plugin '%s' (instance='%s') added", logId)
+	logger.Debugf("Plugin '%s' added", logId)
 
 	reg.onPluginChange.Notify(&PluginChange{
 		action:       RegistryAdd,
@@ -296,7 +296,13 @@ func (reg *registry) GetComponentData(id string) ComponentData {
 	reg.mux.Lock()
 	defer reg.mux.Unlock()
 
-	return reg.components[id]
+	compData, exists := reg.components[id]
+	if exists {
+		return compData
+	} else {
+		// Mandatory to return a nil value as interface
+		return nil
+	}
 }
 
 func (reg *registry) GetComponentsData() []ComponentData {
