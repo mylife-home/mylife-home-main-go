@@ -10,27 +10,31 @@ import (
 )
 
 type binding struct {
-	registry             components.Registry
-	config               *store.BindingConfig
-	source               *bindingComponent
-	target               *bindingComponent
-	errors               []string
-	registryChangeToken  tools.RegistrationToken
-	componentChangeToken tools.RegistrationToken
+	registry            components.Registry
+	config              *store.BindingConfig
+	componentChangeChan chan *components.ComponentChange
+	workerExited        chan struct{}
+
+	// updated by worker
+	sourceInstance string
+	source         components.Component
+	targetInstance string
+	target         components.Component
+	sourceState    tools.ObservableValue[any]
+	targetAction   chan<- any
 }
 
 func makeBinding(registry components.Registry, config *store.BindingConfig) *binding {
 	b := &binding{
-		registry: registry,
-		config:   config,
-		errors:   make([]string, 0),
+		registry:            registry,
+		config:              config,
+		componentChangeChan: make(chan *components.ComponentChange),
+		workerExited:        make(chan struct{}),
 	}
 
-	b.registryChangeToken = b.registry.OnComponentChange().Register(b.onComponentChange)
+	go b.worker()
 
-	for _, data := range b.registry.GetComponentsData().Clone() {
-		b.onComponentAdd(data.InstanceName(), data.Component())
-	}
+	b.registry.OnComponentChange().Subscribe(b.componentChangeChan)
 
 	logger.Infof("Binding '%s' created", b.config)
 
@@ -38,181 +42,171 @@ func makeBinding(registry components.Registry, config *store.BindingConfig) *bin
 }
 
 func (b *binding) Terminate() {
-	b.registry.OnComponentChange().Unregister(b.registryChangeToken)
-
-	source := b.source
-	if source != nil {
-		b.onComponentRemove(source.instanceName, source.component)
-	}
-
-	target := b.target
-	if target != nil {
-		b.onComponentRemove(target.instanceName, target.component)
-	}
+	b.registry.OnComponentChange().Unsubscribe(b.componentChangeChan)
+	close(b.componentChangeChan)
+	<-b.workerExited
 
 	logger.Infof("Binding '%s' closed", b.config)
 }
 
-func (b *binding) Error() bool {
-	return len(b.errors) > 0
+func (b *binding) worker() {
+	b.onInit()
+	defer b.onClose()
+
+	for {
+		select {
+		case change, ok := <-b.componentChangeChan:
+			if !ok {
+				return
+			}
+
+			b.onComponentChange(change)
+		}
+	}
 }
 
-func (b *binding) Errors() tools.ReadonlySlice[string] {
-	return tools.NewReadonlySlice(b.errors)
+func (b *binding) onInit() {
+	sourceData := b.registry.GetComponentData(b.config.SourceComponent)
+	targetData := b.registry.GetComponentData(b.config.TargetComponent)
+
+	if sourceData != nil {
+		b.sourceInstance = sourceData.InstanceName()
+		b.source = sourceData.Component()
+	}
+
+	if targetData != nil {
+		b.targetInstance = targetData.InstanceName()
+		b.target = targetData.Component()
+	}
+
+	b.refreshBinding()
 }
 
-func (b *binding) Active() bool {
-	return b.source != nil && b.target != nil && !b.Error()
+func (b *binding) onClose() {
+	b.sourceInstance = ""
+	b.source = nil
+	b.targetInstance = ""
+	b.target = nil
+
+	b.refreshBinding()
 }
 
 func (b *binding) onComponentChange(change *components.ComponentChange) {
-	switch change.Action() {
-	case components.RegistryAdd:
-		b.onComponentAdd(change.InstanceName(), change.Component())
-	case components.RegistryRemove:
-		b.onComponentRemove(change.InstanceName(), change.Component())
-	}
-}
+	comp := change.Component()
 
-func (b *binding) onComponentAdd(instanceName string, component components.Component) {
-	switch component.Id() {
+	switch comp.Id() {
 	case b.config.SourceComponent:
-		b.source = &bindingComponent{
-			instanceName: instanceName,
-			component:    component,
+		switch change.Action() {
+		case components.RegistryAdd:
+			b.sourceInstance = change.InstanceName()
+			b.source = comp
+		case components.RegistryRemove:
+			b.sourceInstance = ""
+			b.source = nil
 		}
-		b.initBinding()
+
+		b.refreshBinding()
 
 	case b.config.TargetComponent:
-		b.target = &bindingComponent{
-			instanceName: instanceName,
-			component:    component,
+		switch change.Action() {
+		case components.RegistryAdd:
+			b.targetInstance = change.InstanceName()
+			b.target = comp
+		case components.RegistryRemove:
+			b.targetInstance = ""
+			b.target = nil
 		}
-		b.initBinding()
+
+		b.refreshBinding()
 	}
 }
 
-func (b *binding) onComponentRemove(instanceName string, component components.Component) {
-	var sourceComponent components.Component
-	var targetComponent components.Component
+func (b *binding) refreshBinding() {
+	// check if the state is already consistent
+	shouldActivate := b.source != nil && b.target != nil
+	active := b.targetAction != nil && b.sourceState != nil
 
-	if b.source != nil {
-		sourceComponent = b.source.component
-	}
-	if b.target != nil {
-		targetComponent = b.target.component
-	}
-
-	switch component {
-	case sourceComponent:
-		b.terminateBinding()
-		b.source = nil
-
-	case targetComponent:
-		b.terminateBinding()
-		b.target = nil
-	}
-}
-
-func (b *binding) initBinding() {
-	if b.source == nil || b.target == nil {
+	if shouldActivate == active {
 		return
 	}
 
-	sourceState := b.config.SourceState
-	targetAction := b.config.TargetAction
+	if shouldActivate {
+		if !b.validate() {
+			return
+		}
 
-	// assert that props exists and type matches
-	sourcePlugin := b.source.component.Plugin()
-	targetPlugin := b.target.component.Plugin()
-	sourceMember := b.findMember(sourcePlugin, sourceState, metadata.State)
-	targetMember := b.findMember(targetPlugin, targetAction, metadata.Action)
+		// enable binding
+		b.sourceState = b.source.StateItem(b.config.SourceState)
+		b.targetAction = b.target.Action(b.config.TargetAction)
+
+		// nil value indicate that the state is not fetched yet.
+		// Do not transmit in case.
+		value := b.sourceState.Get()
+		if value != nil {
+			b.targetAction <- value
+		}
+
+		// Note: we may miss a state change here
+
+		b.sourceState.Subscribe(b.targetAction)
+
+	} else {
+		// disable binding
+		b.sourceState.Unsubscribe(b.targetAction)
+		b.sourceState = nil
+		b.targetAction = nil
+	}
+}
+
+func (b *binding) validate() bool {
 
 	errors := make([]string, 0)
 
-	if sourceMember == nil {
-		err := fmt.Sprintf("State '%s' does not exist on component %s", sourceState, b.buildComponentFullId(b.source))
+	sourceState := b.findMember(b.source, b.config.SourceState, metadata.State)
+	targetAction := b.findMember(b.source, b.config.TargetAction, metadata.Action)
+
+	if sourceState == nil {
+		err := fmt.Sprintf("State '%s' does not exist on component %s", b.config.SourceState, b.buildComponentFullId(b.sourceInstance, b.source))
 		errors = append(errors, err)
 	}
 
-	if targetMember == nil {
-		err := fmt.Sprintf("Action '%s' does not exist on component %s", targetAction, b.buildComponentFullId(b.target))
+	if targetAction == nil {
+		err := fmt.Sprintf("Action '%s' does not exist on component %s", b.config.TargetAction, b.buildComponentFullId(b.targetInstance, b.target))
 		errors = append(errors, err)
 	}
 
-	if sourceMember != nil && targetMember != nil {
-		sourceType := sourceMember.ValueType()
-		targetType := targetMember.ValueType()
+	if sourceState != nil && targetAction != nil {
+		sourceType := sourceState.ValueType()
+		targetType := targetAction.ValueType()
 		if !metadata.TypeEquals(sourceType, targetType) {
-			sourceDesc := fmt.Sprintf("State '%s' on component %s", sourceState, b.buildComponentFullId(b.source))
-			targetDesc := fmt.Sprintf("action '%s' on component %s", targetAction, b.buildComponentFullId(b.target))
+			sourceDesc := fmt.Sprintf("State '%s' on component %s", sourceState.Name(), b.buildComponentFullId(b.sourceInstance, b.source))
+			targetDesc := fmt.Sprintf("action '%s' on component %s", targetAction.Name(), b.buildComponentFullId(b.targetInstance, b.target))
 			err := fmt.Sprintf("%s has type '%s', which is different from type '%s' for %s", sourceDesc, sourceType, targetType, targetDesc)
 			errors = append(errors, err)
 		}
 	}
 
-	b.errors = errors
 	if len(errors) > 0 {
-		// we have errors, do not activate binding
 		logger.Errorf("Binding '%s' errors: %s", b.config, strings.Join(errors, ", "))
-		return
+		return false
 	}
 
-	sourceComponent := b.source.component
-
-	b.componentChangeToken = sourceComponent.OnStateChange().Register(b.onSourceStateChange)
-
-	value := sourceComponent.GetStateItem(sourceState)
-	if value != nil {
-		// else not provided yet, don't bind null values
-		b.target.component.ExecuteAction(targetAction, value)
-	}
-
-	logger.Debugf("Binding '%s' activated", b.config)
+	return true
 }
 
-func (b *binding) terminateBinding() {
-	if b.Active() {
-		b.source.component.OnStateChange().Unregister(b.componentChangeToken)
+func (b *binding) buildComponentFullId(instanceName string, comp components.Component) string {
+	if instanceName == "" {
+		instanceName = "local"
 	}
 
-	b.errors = make([]string, 0)
-
-	logger.Debugf("Binding '%s' deactivated", b.config)
+	return fmt.Sprintf("'%s' (plugin='%s:%s')", comp.Id(), instanceName, comp.Plugin().Id())
 }
 
-func (b *binding) onSourceStateChange(change *components.StateChange) {
-	sourceState := b.config.SourceState
-	targetAction := b.config.TargetAction
-
-	if change.Name() != sourceState {
-		return
-	}
-
-	if b.target != nil {
-		b.target.component.ExecuteAction(targetAction, change.Value())
-	}
-}
-
-func (b *binding) findMember(plugin *metadata.Plugin, name string, memberType metadata.MemberType) *metadata.Member {
-	member := plugin.Member(name)
+func (b *binding) findMember(comp components.Component, name string, memberType metadata.MemberType) *metadata.Member {
+	member := comp.Plugin().Member(name)
 	if member != nil && member.MemberType() == memberType {
 		return member
 	} else {
 		return nil
 	}
-}
-
-func (b *binding) buildComponentFullId(comp *bindingComponent) string {
-	instanceName := "local"
-	if comp.instanceName != "" {
-		instanceName = comp.instanceName
-	}
-
-	return fmt.Sprintf("'%s' (plugin='%s:%s')", comp.component.Id(), instanceName, comp.component.Plugin().Id())
-}
-
-type bindingComponent struct {
-	instanceName string
-	component    components.Component
 }
