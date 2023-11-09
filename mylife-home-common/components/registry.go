@@ -185,12 +185,14 @@ func (reg *registry) updateInstance(instanceName string, callback func(*instance
 		}
 
 		reg.instances[instanceName] = data
+		logger.Debugf("Instance '%s' added", instanceName)
 	}
 
 	callback(data)
 
 	if len(data.plugins) == 0 && len(data.components) == 0 {
 		delete(reg.instances, instanceName)
+		logger.Debugf("Instance '%s' removed", instanceName)
 	}
 }
 
