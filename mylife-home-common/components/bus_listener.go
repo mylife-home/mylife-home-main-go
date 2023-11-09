@@ -5,32 +5,38 @@ import (
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/tools"
 	"strings"
-
-	"github.com/gookit/goutil/errorx/panics"
-	"golang.org/x/exp/maps"
+	"sync"
 )
 
-// Publish remote components/plugins in the registry
-type busListener struct {
-	transport   *bus.Transport
-	registry    *Registry
-	instances   map[string]*busInstance
-	changeToken tools.RegistrationToken
+type BusListener interface {
+	Terminate()
 }
 
-func newBusPublisher(transport *bus.Transport, registry *Registry) *busListener {
-	if !transport.Presence().Tracking() {
-		panic("cannot use 'BusPublisher' with presence tracking disabled")
-	}
+var _ BusListener = (*busListener)(nil)
 
+type busListener struct {
+	transport              *bus.Transport
+	registry               Registry
+	onChange               chan *bus.InstancePresenceChange
+	onChangeListenerClosed chan struct{}
+	instances              map[string]*busInstance
+	mux                    sync.Mutex
+}
+
+// Publish remote components/plugins in the registry
+func ListenBus(transport *bus.Transport, registry Registry) BusListener {
 	listener := &busListener{
-		transport: transport,
-		registry:  registry,
-		instances: make(map[string]*busInstance), // only changed from mqtt thread
+		transport:              transport,
+		registry:               registry,
+		onChange:               make(chan *bus.InstancePresenceChange),
+		onChangeListenerClosed: make(chan struct{}),
+		instances:              make(map[string]*busInstance),
 	}
 
-	listener.changeToken = listener.transport.Presence().OnInstanceChange().Register(listener.onInstanceChange)
+	go listener.onChangeListener()
+	listener.transport.Presence().OnChange().Subscribe(listener.onChange)
 
+	// Note: a change may occur before we get the complete list
 	for _, instanceName := range transport.Presence().GetOnlines() {
 		listener.setInstance(instanceName)
 	}
@@ -39,117 +45,149 @@ func newBusPublisher(transport *bus.Transport, registry *Registry) *busListener 
 }
 
 func (listener *busListener) Terminate() {
-	listener.transport.Presence().OnInstanceChange().Unregister(listener.changeToken)
+	listener.transport.Presence().OnChange().Unsubscribe(listener.onChange)
+	close(listener.onChange)
+	<-listener.onChangeListenerClosed
 
-	// clone for stability
-	for _, instanceName := range maps.Keys(listener.instances) {
+	// Finish all instances
+	// No need to take mutex since the listener routine is terminated
+	for instanceName := range listener.instances {
 		listener.clearInstance(instanceName)
 	}
 }
 
-func (listener *busListener) onInstanceChange(change *bus.InstancePresenceChange) {
-	if change.Online() {
-		listener.setInstance(change.InstanceName())
-	} else {
-		listener.clearInstance(change.InstanceName())
+func (listener *busListener) onChangeListener() {
+	defer close(listener.onChangeListenerClosed)
+
+	for change := range listener.onChange {
+		if change.Online() {
+			listener.setInstance(change.InstanceName())
+		} else {
+			listener.clearInstance(change.InstanceName())
+		}
 	}
 }
 
 func (listener *busListener) setInstance(instanceName string) {
+	listener.mux.Lock()
+	defer listener.mux.Unlock()
+
+	if _, exists := listener.instances[instanceName]; exists {
+		return
+	}
+
 	instance := newBusInstance(listener.transport, listener.registry, instanceName)
 	listener.instances[instanceName] = instance
 }
 
 func (listener *busListener) clearInstance(instanceName string) {
-	instance := listener.instances[instanceName]
+	listener.mux.Lock()
+	defer listener.mux.Unlock()
+
+	instance, exists := listener.instances[instanceName]
+	if !exists {
+		return
+	}
+
 	instance.Terminate()
 	delete(listener.instances, instanceName)
 }
 
 type busInstance struct {
-	transport       *bus.Transport
-	view            bus.RemoteMetadataView
-	viewChangeToken tools.RegistrationToken
-	registry        *Registry
-	instanceName    string
+	transport    *bus.Transport
+	registry     Registry
+	instanceName string
+	exit         chan struct{}
+	plugins      map[string]struct{}
+	components   map[string]struct{}
+	// There is no garanty of plugins vs components metadata subscribe results
+	// when we connect and the other instance is already here.
+	// So in case we get components before plugins, we put them in a pending list
+	pendingComponents map[string]*metadata.Component
+	mux               sync.Mutex
 }
 
-func newBusInstance(transport *bus.Transport, registry *Registry, instanceName string) *busInstance {
+func newBusInstance(transport *bus.Transport, registry Registry, instanceName string) *busInstance {
 	instance := &busInstance{
-		transport:    transport,
-		registry:     registry,
-		instanceName: instanceName,
+		transport:         transport,
+		registry:          registry,
+		instanceName:      instanceName,
+		exit:              make(chan struct{}),
+		plugins:           make(map[string]struct{}),
+		components:        make(map[string]struct{}),
+		pendingComponents: make(map[string]*metadata.Component),
 	}
 
-	view := instance.transport.Metadata().CreateView(instance.instanceName)
-	instance.view = view
-	instance.viewChangeToken = instance.view.OnChange().Register(instance.onViewChange)
-	instance.initView()
+	go instance.worker()
 
 	return instance
 }
 
+// Returns immediately, proper close happens in background
 func (instance *busInstance) Terminate() {
-	// clone for stability
-	for _, data := range instance.registry.GetComponentsData().Clone() {
-		if data.InstanceName() == instance.instanceName {
-			instance.clearComponent(data.Component().Id())
-		}
+	close(instance.exit)
+
+	instance.mux.Lock()
+	defer instance.mux.Unlock()
+
+	// immediately clean stuff
+	clear(instance.pendingComponents)
+
+	for id := range instance.components {
+		instance.clearComponent(id)
 	}
 
-	for _, plugin := range instance.registry.GetPlugins(instance.instanceName).Clone() {
-		instance.clearPlugin(plugin.Id())
-	}
-
-	instance.view.OnChange().Unregister(instance.viewChangeToken)
-	instance.transport.Metadata().CloseView(instance.view)
-}
-
-func (instance *busInstance) initView() {
-	// set first plugins then components
-	type item struct {
-		id    string
-		value any
-	}
-
-	plugins := make([]item, 0)
-	components := make([]item, 0)
-
-	it := instance.view.Values().Iterate()
-	for it.Next() {
-		path, value := it.Get()
-
-		parts := strings.SplitN(path, "/", 2)
-		typ := parts[0]
-		id := ""
-		if len(parts) > 1 {
-			id = parts[1]
-		}
-
-		switch typ {
-		case "plugins":
-			plugins = append(plugins, item{id, value})
-		case "components":
-			components = append(components, item{id, value})
-		}
-	}
-
-	for _, it := range plugins {
-		instance.setPlugin(it.id, it.value)
-	}
-
-	for _, it := range components {
-		instance.setComponent(it.id, it.value)
+	for id := range instance.plugins {
+		instance.clearPlugin(id)
 	}
 }
 
-func (instance *busInstance) onViewChange(change *bus.ValueChange) {
-	parts := strings.SplitN(change.Path(), "/", 2)
-	typ := parts[0]
-	id := ""
-	if len(parts) > 1 {
-		id = parts[1]
+// Needed to manage lifetime properly (since calls may be long, this outlive instance methods calls)
+func (instance *busInstance) worker() {
+	view, err := instance.transport.Metadata().CreateView(instance.instanceName)
+	if err != nil {
+		logger.WithError(err).Errorf("Could not listen for instance metadata '%s'", instance.instanceName)
+		return
 	}
+
+	defer func() {
+		if view != nil {
+			instance.transport.Metadata().CloseView(view)
+		}
+	}()
+
+	onChange := make(chan *bus.ValueChange)
+	onChangeListenerClosed := make(chan struct{})
+
+	go instance.onChangeListener(onChange, onChangeListenerClosed)
+	view.OnChange().Subscribe(onChange)
+
+	defer func() {
+		view.OnChange().Unsubscribe(onChange)
+		close(onChange)
+		<-onChangeListenerClosed
+	}()
+
+	// Note: a change may occur before we get the complete list
+	instance.initValues(view.Values())
+
+	// Wait for close
+	<-instance.exit
+}
+
+func (instance *busInstance) onChangeListener(onChange <-chan *bus.ValueChange, exit chan<- struct{}) {
+	defer close(exit)
+
+	for change := range onChange {
+		instance.handleChange(change)
+	}
+}
+
+func (instance *busInstance) handleChange(change *bus.ValueChange) {
+	instance.mux.Lock()
+	defer instance.mux.Unlock()
+
+	typ, id := instance.parsePath(change.Path())
 
 	switch change.Type() {
 	case bus.ValueSet:
@@ -170,6 +208,33 @@ func (instance *busInstance) onViewChange(change *bus.ValueChange) {
 	}
 }
 
+func (instance *busInstance) initValues(values map[string]any) {
+	// At least ensure the changeset is consistent
+	instance.mux.Lock()
+	defer instance.mux.Unlock()
+
+	for path, value := range values {
+		typ, id := instance.parsePath(path)
+
+		switch typ {
+		case "plugins":
+			instance.setPlugin(id, value)
+		case "components":
+			instance.setComponent(id, value)
+		}
+	}
+}
+
+func (instance *busInstance) parsePath(path string) (typ string, id string) {
+	parts := strings.SplitN(path, "/", 2)
+	typ = parts[0]
+	id = ""
+	if len(parts) > 1 {
+		id = parts[1]
+	}
+	return
+}
+
 func (instance *busInstance) setPlugin(id string, value any) {
 	// set semantic
 	if instance.registry.HasPlugin(instance.instanceName, id) {
@@ -179,6 +244,26 @@ func (instance *busInstance) setPlugin(id string, value any) {
 	plugin := metadata.Serializer.DeserializePlugin(value)
 
 	instance.registry.AddPlugin(instance.instanceName, plugin)
+	instance.plugins[id] = struct{}{}
+
+	// See if we have pending component matching this plugin
+	for id, netComp := range instance.pendingComponents {
+		if netComp.Plugin() == id {
+			instance.setComp(netComp.Id(), plugin)
+			delete(instance.pendingComponents, id)
+		}
+	}
+}
+
+func (instance *busInstance) clearPlugin(id string) {
+	plugin := instance.registry.GetPlugin(instance.instanceName, id)
+	// set semantic
+	if plugin == nil {
+		return
+	}
+
+	instance.registry.RemovePlugin(instance.instanceName, plugin)
+	delete(instance.plugins, id)
 }
 
 func (instance *busInstance) setComponent(id string, value any) {
@@ -188,19 +273,35 @@ func (instance *busInstance) setComponent(id string, value any) {
 	}
 
 	netComp := metadata.Serializer.DeserializeComponent(value)
-	comp := newBusComponent(instance.transport, instance.instanceName, instance.registry, netComp)
-	instance.registry.AddComponent(instance.instanceName, comp)
+
+	plugin := instance.registry.GetPlugin(instance.instanceName, netComp.Plugin())
+	if plugin == nil {
+		logger.Debugf("Got component '%s' without corresponding plugin '%s' on instance '%s'. Adding to pending list.", netComp.Id(), netComp.Plugin(), instance.instanceName)
+		instance.pendingComponents[netComp.Id()] = netComp
+		return
+	}
+
+	instance.setComp(id, plugin)
 }
 
-func (instance *busInstance) clearPlugin(id string) {
-	plugin := instance.registry.GetPlugin(instance.instanceName, id)
-	instance.registry.RemovePlugin(instance.instanceName, plugin)
+func (instance *busInstance) setComp(id string, plugin *metadata.Plugin) {
+	comp := newBusComponent(instance.transport, instance.instanceName, instance.registry, id, plugin)
+
+	instance.registry.AddComponent(instance.instanceName, comp)
+	instance.components[id] = struct{}{}
 }
 
 func (instance *busInstance) clearComponent(id string) {
-	comp := instance.registry.GetComponent(id).(*busComponent)
+	comp := instance.registry.GetComponent(id)
+	// set semantic
+	if comp == nil {
+		return
+	}
+
 	instance.registry.RemoveComponent(instance.instanceName, comp)
-	comp.Terminate()
+	delete(instance.components, id)
+
+	comp.(*busComponent).Terminate()
 }
 
 var _ Component = (*busComponent)(nil)
@@ -211,48 +312,72 @@ type busComponent struct {
 	instanceName    string
 	id              string
 	plugin          *metadata.Plugin
-	state           map[string]any
-	onStateChange   *tools.CallbackManager[*StateChange]
+	state           map[string]tools.ObservableValue[any]
+	actions         map[string]chan<- any
 }
 
-func newBusComponent(transport *bus.Transport, instanceName string, registry *Registry, netComp *metadata.Component) *busComponent {
+func newBusComponent(transport *bus.Transport, instanceName string, registry Registry, id string, plugin *metadata.Plugin) *busComponent {
 	comp := &busComponent{
-		transport:     transport,
-		instanceName:  instanceName,
-		id:            netComp.Id(),
-		plugin:        registry.GetPlugin(instanceName, netComp.Plugin()),
-		state:         make(map[string]any),
-		onStateChange: tools.NewCallbackManager[*StateChange](),
+		transport:    transport,
+		instanceName: instanceName,
+		id:           id,
+		plugin:       plugin,
+		state:        make(map[string]tools.ObservableValue[any]),
+		actions:      make(map[string]chan<- any),
 	}
-
-	panics.IsTrue(comp.plugin != nil, "could not find plugin '%s:%s' of component '%s'", instanceName, netComp.Plugin(), netComp.Id())
 
 	comp.remoteComponent = transport.Components().TrackRemoteComponent(comp.instanceName, comp.id)
 
 	for _, name := range comp.plugin.MemberNames() {
 		member := comp.plugin.Member(name)
-		if member.MemberType() == metadata.State {
-			comp.state[name] = nil
-		}
-	}
+		switch member.MemberType() {
+		case metadata.State:
+			comp.state[name] = comp.initState(member)
 
-	for name := range comp.state {
-		// Else it seems that the name inside the closure in incorrect
-		closedName := name
-		comp.remoteComponent.RegisterStateChange(name, func(data []byte) {
-			comp.stateChange(closedName, data)
-		})
+		case metadata.Action:
+			comp.actions[name] = comp.initAction(member)
+		}
 	}
 
 	return comp
 }
 
-func (comp *busComponent) Terminate() {
-	comp.transport.Components().UntrackRemoteComponent(comp.remoteComponent)
+func (comp *busComponent) initState(member *metadata.Member) tools.ObservableValue[any] {
+	name := member.Name()
+	// Note: nil = no value for now, will come as soon as we get them from the bus
+	subject := tools.MakeSubjectValue[any](nil)
+
+	// finish init in background
+	go comp.remoteComponent.RegisterStateChange(name, func(data []byte) {
+		value := bus.Encoding.ReadValue(member.ValueType(), data)
+		// dispatch async
+		go subject.Update(value)
+	})
+
+	return subject
 }
 
-func (comp *busComponent) OnStateChange() tools.CallbackRegistration[*StateChange] {
-	return comp.onStateChange
+func (comp *busComponent) initAction(member *metadata.Member) chan<- any {
+	name := member.Name()
+	channel := make(chan any)
+
+	tools.DispatchChannel(channel, func(value any) {
+		data := bus.Encoding.WriteValue(member.ValueType(), value)
+		// emit async
+		go comp.remoteComponent.EmitAction(name, data)
+	})
+
+	return channel
+}
+
+func (comp *busComponent) Terminate() {
+
+	for _, channel := range comp.actions {
+		close(channel)
+	}
+
+	// finish close in background
+	go comp.transport.Components().UntrackRemoteComponent(comp.remoteComponent)
 }
 
 func (comp *busComponent) Id() string {
@@ -263,31 +388,10 @@ func (comp *busComponent) Plugin() *metadata.Plugin {
 	return comp.plugin
 }
 
-func (comp *busComponent) GetStateItem(name string) any {
+func (comp *busComponent) StateItem(name string) tools.ObservableValue[any] {
 	return comp.state[name]
 }
 
-func (comp *busComponent) GetState() tools.ReadonlyMap[string, any] {
-	return tools.NewReadonlyMap[string, any](comp.state)
-}
-
-func (comp *busComponent) stateChange(name string, data []byte) {
-	member := comp.plugin.Member(name)
-	value := bus.Encoding.ReadValue(member.ValueType(), data)
-	comp.state[name] = value
-	comp.onStateChange.Execute(&StateChange{
-		name:  name,
-		value: value,
-	})
-}
-
-func (comp *busComponent) ExecuteAction(name string, value any) {
-	member := comp.plugin.Member(name)
-	if member == nil || member.MemberType() != metadata.Action {
-		logger.Errorf("unknown action '%s' on component '%s' (plugin=%s:%s)", name, comp.id, comp.instanceName, comp.plugin.Id())
-		return
-	}
-
-	data := bus.Encoding.WriteValue(member.ValueType(), value)
-	comp.remoteComponent.EmitAction(name, data)
+func (comp *busComponent) Action(name string) chan<- any {
+	return comp.actions[name]
 }
