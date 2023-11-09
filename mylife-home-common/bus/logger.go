@@ -111,13 +111,12 @@ func (logger *Logger) send(entry *publish.LogEntry) {
 }
 
 func (logger *Logger) waitOnline() bool {
-	if logger.client.Online().Get() {
-		return true
-	}
-
 	ch := make(chan bool)
 
-	logger.client.Online().Subscribe(ch)
+	go func() {
+		// submit async else we will deadlock
+		logger.client.Online().Subscribe(ch, true)
+	}()
 	defer func() {
 		logger.client.Online().Unsubscribe(ch)
 	}()

@@ -40,7 +40,7 @@ func PublishBus(transport *bus.Transport, registry Registry) BusPublisher {
 
 	go publisher.worker()
 
-	publisher.transport.Online().Subscribe(publisher.onlineChan)
+	publisher.transport.Online().Subscribe(publisher.onlineChan, false)
 	publisher.registry.OnPluginChange().Subscribe(publisher.pluginChangeChan)
 	publisher.registry.OnComponentChange().Subscribe(publisher.componentChangeChan)
 
@@ -350,9 +350,7 @@ func (bc *busPublisherComponent) registerState(member *metadata.Member) {
 	})
 
 	obsvalue := bc.component.StateItem(name)
-	obsvalue.Subscribe(channel)
-
-	bc.publishState(name, obsvalue.Get())
+	obsvalue.Subscribe(channel, true)
 }
 
 func (bc *busPublisherComponent) unpublishComponent() {

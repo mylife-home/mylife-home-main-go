@@ -16,12 +16,13 @@ type binding struct {
 	workerExited        chan struct{}
 
 	// updated by worker
-	sourceInstance string
-	source         components.Component
-	targetInstance string
-	target         components.Component
-	sourceState    tools.ObservableValue[any]
-	targetAction   chan<- any
+	sourceInstance  string
+	source          components.Component
+	targetInstance  string
+	target          components.Component
+	sourceState     tools.ObservableValue[any]
+	sourceStateChan chan any
+	targetAction    chan<- any
 }
 
 func makeBinding(registry components.Registry, config *store.BindingConfig) *binding {
@@ -53,15 +54,8 @@ func (b *binding) worker() {
 	b.onInit()
 	defer b.onClose()
 
-	for {
-		select {
-		case change, ok := <-b.componentChangeChan:
-			if !ok {
-				return
-			}
-
-			b.onComponentChange(change)
-		}
+	for change := range b.componentChangeChan {
+		b.onComponentChange(change)
 	}
 }
 
@@ -138,21 +132,27 @@ func (b *binding) refreshBinding() {
 		// enable binding
 		b.sourceState = b.source.StateItem(b.config.SourceState)
 		b.targetAction = b.target.Action(b.config.TargetAction)
+		b.sourceStateChan = make(chan any)
 
 		// nil value indicate that the state is not fetched yet.
 		// Do not transmit in case.
-		value := b.sourceState.Get()
-		if value != nil {
-			b.targetAction <- value
+		filter := func(in any) bool {
+			return in != nil
 		}
 
-		// Note: we may miss a state change here
+		tools.PipeChannel(
+			tools.FilterChannel(b.sourceStateChan, filter),
+			b.targetAction,
+			false,
+		)
 
-		b.sourceState.Subscribe(b.targetAction)
+		b.sourceState.Subscribe(b.sourceStateChan, true)
 
 	} else {
 		// disable binding
-		b.sourceState.Unsubscribe(b.targetAction)
+		b.sourceState.Unsubscribe(b.sourceStateChan)
+		close(b.sourceStateChan) // will end the filter/pipe, but won't touch action chan
+		b.sourceStateChan = nil
 		b.sourceState = nil
 		b.targetAction = nil
 	}

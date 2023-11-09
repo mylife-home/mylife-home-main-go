@@ -29,7 +29,7 @@ func newRpc(client *client) *Rpc {
 	}
 
 	go rpc.worker()
-	rpc.client.Online().Subscribe(rpc.onlineChan)
+	rpc.client.Online().Subscribe(rpc.onlineChan, false)
 
 	return rpc
 }
@@ -148,7 +148,7 @@ func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address s
 	}
 
 	onlineChan := make(chan bool, 10)
-	rpc.client.Online().Subscribe(onlineChan)
+	rpc.client.Online().Subscribe(onlineChan, true)
 	defer func() {
 		rpc.client.Online().Unsubscribe(onlineChan)
 	}()

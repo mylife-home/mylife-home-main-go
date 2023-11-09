@@ -34,13 +34,13 @@ func NewTransport() *Transport {
 		metadata:   newMetadata(client),
 		logger:     newLogger(client),
 
-		onlineChan:             make(chan bool, 10),
-		instanceInfoUpdateChan: make(chan *instance_info.InstanceInfo, 10),
+		onlineChan:             make(chan bool),
+		instanceInfoUpdateChan: make(chan *instance_info.InstanceInfo),
 	}
 
 	go transport.publishWorker()
 
-	transport.client.Online().Subscribe(transport.onlineChan)
+	transport.client.Online().Subscribe(transport.onlineChan, false)
 	instance_info.OnUpdate().Subscribe(transport.instanceInfoUpdateChan)
 
 	return transport
@@ -111,12 +111,14 @@ func (transport *Transport) publishWorker() {
 			instanceInfo = data
 		}
 
-		switch err := transport.metadata.Set("instance-info", instanceInfo); {
-		case err == nil, err == errClosing:
-			// OK
-		default:
-			logger.WithError(err).Error("could not publish instance info")
-		}
+		go func() {
+			switch err := transport.metadata.Set("instance-info", instanceInfo); {
+			case err == nil, err == errClosing:
+				// OK
+			default:
+				logger.WithError(err).Error("could not publish instance info")
+			}
+		}()
 	}
 }
 

@@ -127,9 +127,11 @@ func FilterChannel[T any](in <-chan T, filter func(in T) bool) <-chan T {
 }
 
 // Connect one channel to another
-func PipeChannel[T any](in <-chan T, out chan<- T) {
+func PipeChannel[T any](in <-chan T, out chan<- T, closeOut bool) {
 	go func() {
-		defer close(out)
+		if closeOut {
+			defer close(out)
+		}
 
 		for vin := range in {
 			out <- vin

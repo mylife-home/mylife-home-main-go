@@ -45,7 +45,7 @@ func newPresence(client *client) *Presence {
 	}
 
 	go presence.worker()
-	presence.client.Online().Subscribe(presence.onlineChan)
+	presence.client.Online().Subscribe(presence.onlineChan, false)
 
 	return presence
 }

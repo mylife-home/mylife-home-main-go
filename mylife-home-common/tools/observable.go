@@ -16,7 +16,7 @@ type Subject[T any] interface {
 }
 
 type ObservableValue[T any] interface {
-	Subscribe(observer chan<- T)
+	Subscribe(observer chan<- T, sendCurrent bool)
 	Unsubscribe(observer chan<- T)
 	Get() T
 }
@@ -136,11 +136,20 @@ func (sub *subjectValue[T]) Update(newValue T) {
 
 }
 
-func (sub *subjectValue[T]) Subscribe(observer chan<- T) {
+func (sub *subjectValue[T]) Subscribe(observer chan<- T, sendCurrent bool) {
+	if sendCurrent {
+		sub.valMux.RLock()
+		defer sub.valMux.RUnlock()
+	}
+
 	sub.obsMux.Lock()
 	defer sub.obsMux.Unlock()
 
 	sub.observers[observer] = struct{}{}
+
+	if sendCurrent {
+		observer <- sub.value
+	}
 }
 
 func (sub *subjectValue[T]) Unsubscribe(observer chan<- T) {
