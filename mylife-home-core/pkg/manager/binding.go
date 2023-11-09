@@ -51,6 +51,7 @@ func (b *binding) Terminate() {
 }
 
 func (b *binding) worker() {
+	defer close(b.workerExited)
 	b.onInit()
 	defer b.onClose()
 
@@ -163,7 +164,7 @@ func (b *binding) validate() bool {
 	errors := make([]string, 0)
 
 	sourceState := b.findMember(b.source, b.config.SourceState, metadata.State)
-	targetAction := b.findMember(b.source, b.config.TargetAction, metadata.Action)
+	targetAction := b.findMember(b.target, b.config.TargetAction, metadata.Action)
 
 	if sourceState == nil {
 		err := fmt.Sprintf("State '%s' does not exist on component %s", b.config.SourceState, b.buildComponentFullId(b.sourceInstance, b.source))
