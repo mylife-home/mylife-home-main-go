@@ -19,7 +19,7 @@ type busListener struct {
 	registry               Registry
 	onChange               chan *bus.InstancePresenceChange
 	onChangeListenerClosed chan struct{}
-	instances              map[string]*busInstance
+	instances              map[string]*busListenerInstance
 	mux                    sync.Mutex
 }
 
@@ -30,7 +30,7 @@ func ListenBus(transport *bus.Transport, registry Registry) BusListener {
 		registry:               registry,
 		onChange:               make(chan *bus.InstancePresenceChange),
 		onChangeListenerClosed: make(chan struct{}),
-		instances:              make(map[string]*busInstance),
+		instances:              make(map[string]*busListenerInstance),
 	}
 
 	go listener.onChangeListener()
@@ -76,7 +76,7 @@ func (listener *busListener) setInstance(instanceName string) {
 		return
 	}
 
-	instance := newBusInstance(listener.transport, listener.registry, instanceName)
+	instance := newBusListenerInstance(listener.transport, listener.registry, instanceName)
 	listener.instances[instanceName] = instance
 }
 
@@ -93,7 +93,7 @@ func (listener *busListener) clearInstance(instanceName string) {
 	delete(listener.instances, instanceName)
 }
 
-type busInstance struct {
+type busListenerInstance struct {
 	transport    *bus.Transport
 	registry     Registry
 	instanceName string
@@ -107,8 +107,8 @@ type busInstance struct {
 	mux               sync.Mutex
 }
 
-func newBusInstance(transport *bus.Transport, registry Registry, instanceName string) *busInstance {
-	instance := &busInstance{
+func newBusListenerInstance(transport *bus.Transport, registry Registry, instanceName string) *busListenerInstance {
+	instance := &busListenerInstance{
 		transport:         transport,
 		registry:          registry,
 		instanceName:      instanceName,
@@ -124,7 +124,7 @@ func newBusInstance(transport *bus.Transport, registry Registry, instanceName st
 }
 
 // Returns immediately, proper close happens in background
-func (instance *busInstance) Terminate() {
+func (instance *busListenerInstance) Terminate() {
 	close(instance.exit)
 
 	instance.mux.Lock()
@@ -143,7 +143,7 @@ func (instance *busInstance) Terminate() {
 }
 
 // Needed to manage lifetime properly (since calls may be long, this outlive instance methods calls)
-func (instance *busInstance) worker() {
+func (instance *busListenerInstance) worker() {
 	view, err := instance.transport.Metadata().CreateView(instance.instanceName)
 	if err != nil {
 		logger.WithError(err).Errorf("Could not listen for instance metadata '%s'", instance.instanceName)
@@ -175,7 +175,7 @@ func (instance *busInstance) worker() {
 	<-instance.exit
 }
 
-func (instance *busInstance) onChangeListener(onChange <-chan *bus.ValueChange, exit chan<- struct{}) {
+func (instance *busListenerInstance) onChangeListener(onChange <-chan *bus.ValueChange, exit chan<- struct{}) {
 	defer close(exit)
 
 	for change := range onChange {
@@ -183,7 +183,7 @@ func (instance *busInstance) onChangeListener(onChange <-chan *bus.ValueChange, 
 	}
 }
 
-func (instance *busInstance) handleChange(change *bus.ValueChange) {
+func (instance *busListenerInstance) handleChange(change *bus.ValueChange) {
 	instance.mux.Lock()
 	defer instance.mux.Unlock()
 
@@ -208,7 +208,7 @@ func (instance *busInstance) handleChange(change *bus.ValueChange) {
 	}
 }
 
-func (instance *busInstance) initValues(values map[string]any) {
+func (instance *busListenerInstance) initValues(values map[string]any) {
 	// At least ensure the changeset is consistent
 	instance.mux.Lock()
 	defer instance.mux.Unlock()
@@ -225,7 +225,7 @@ func (instance *busInstance) initValues(values map[string]any) {
 	}
 }
 
-func (instance *busInstance) parsePath(path string) (typ string, id string) {
+func (instance *busListenerInstance) parsePath(path string) (typ string, id string) {
 	parts := strings.SplitN(path, "/", 2)
 	typ = parts[0]
 	id = ""
@@ -235,7 +235,7 @@ func (instance *busInstance) parsePath(path string) (typ string, id string) {
 	return
 }
 
-func (instance *busInstance) setPlugin(id string, value any) {
+func (instance *busListenerInstance) setPlugin(id string, value any) {
 	// set semantic
 	if instance.registry.HasPlugin(instance.instanceName, id) {
 		return
@@ -255,7 +255,7 @@ func (instance *busInstance) setPlugin(id string, value any) {
 	}
 }
 
-func (instance *busInstance) clearPlugin(id string) {
+func (instance *busListenerInstance) clearPlugin(id string) {
 	plugin := instance.registry.GetPlugin(instance.instanceName, id)
 	// set semantic
 	if plugin == nil {
@@ -266,7 +266,7 @@ func (instance *busInstance) clearPlugin(id string) {
 	delete(instance.plugins, id)
 }
 
-func (instance *busInstance) setComponent(id string, value any) {
+func (instance *busListenerInstance) setComponent(id string, value any) {
 	// set semantic
 	if instance.registry.HasComponent(id) {
 		return
@@ -284,14 +284,14 @@ func (instance *busInstance) setComponent(id string, value any) {
 	instance.setComp(id, plugin)
 }
 
-func (instance *busInstance) setComp(id string, plugin *metadata.Plugin) {
-	comp := newBusComponent(instance.transport, instance.instanceName, instance.registry, id, plugin)
+func (instance *busListenerInstance) setComp(id string, plugin *metadata.Plugin) {
+	comp := newBusListenerComponent(instance.transport, instance.instanceName, instance.registry, id, plugin)
 
 	instance.registry.AddComponent(instance.instanceName, comp)
 	instance.components[id] = struct{}{}
 }
 
-func (instance *busInstance) clearComponent(id string) {
+func (instance *busListenerInstance) clearComponent(id string) {
 	comp := instance.registry.GetComponent(id)
 	// set semantic
 	if comp == nil {
@@ -301,12 +301,12 @@ func (instance *busInstance) clearComponent(id string) {
 	instance.registry.RemoveComponent(instance.instanceName, comp)
 	delete(instance.components, id)
 
-	comp.(*busComponent).Terminate()
+	comp.(*busListenerComponent).Terminate()
 }
 
-var _ Component = (*busComponent)(nil)
+var _ Component = (*busListenerComponent)(nil)
 
-type busComponent struct {
+type busListenerComponent struct {
 	transport       *bus.Transport
 	remoteComponent bus.RemoteComponent
 	instanceName    string
@@ -316,8 +316,8 @@ type busComponent struct {
 	actions         map[string]chan<- any
 }
 
-func newBusComponent(transport *bus.Transport, instanceName string, registry Registry, id string, plugin *metadata.Plugin) *busComponent {
-	comp := &busComponent{
+func newBusListenerComponent(transport *bus.Transport, instanceName string, registry Registry, id string, plugin *metadata.Plugin) *busListenerComponent {
+	comp := &busListenerComponent{
 		transport:    transport,
 		instanceName: instanceName,
 		id:           id,
@@ -342,7 +342,7 @@ func newBusComponent(transport *bus.Transport, instanceName string, registry Reg
 	return comp
 }
 
-func (comp *busComponent) initState(member *metadata.Member) tools.ObservableValue[any] {
+func (comp *busListenerComponent) initState(member *metadata.Member) tools.ObservableValue[any] {
 	name := member.Name()
 	// Note: nil = no value for now, will come as soon as we get them from the bus
 	subject := tools.MakeSubjectValue[any](nil)
@@ -357,7 +357,7 @@ func (comp *busComponent) initState(member *metadata.Member) tools.ObservableVal
 	return subject
 }
 
-func (comp *busComponent) initAction(member *metadata.Member) chan<- any {
+func (comp *busListenerComponent) initAction(member *metadata.Member) chan<- any {
 	name := member.Name()
 	channel := make(chan any)
 
@@ -370,7 +370,7 @@ func (comp *busComponent) initAction(member *metadata.Member) chan<- any {
 	return channel
 }
 
-func (comp *busComponent) Terminate() {
+func (comp *busListenerComponent) Terminate() {
 
 	for _, channel := range comp.actions {
 		close(channel)
@@ -380,18 +380,18 @@ func (comp *busComponent) Terminate() {
 	go comp.transport.Components().UntrackRemoteComponent(comp.remoteComponent)
 }
 
-func (comp *busComponent) Id() string {
+func (comp *busListenerComponent) Id() string {
 	return comp.id
 }
 
-func (comp *busComponent) Plugin() *metadata.Plugin {
+func (comp *busListenerComponent) Plugin() *metadata.Plugin {
 	return comp.plugin
 }
 
-func (comp *busComponent) StateItem(name string) tools.ObservableValue[any] {
+func (comp *busListenerComponent) StateItem(name string) tools.ObservableValue[any] {
 	return comp.state[name]
 }
 
-func (comp *busComponent) Action(name string) chan<- any {
+func (comp *busListenerComponent) Action(name string) chan<- any {
 	return comp.actions[name]
 }
