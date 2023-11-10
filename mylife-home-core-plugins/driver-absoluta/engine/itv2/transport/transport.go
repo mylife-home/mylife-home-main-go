@@ -162,12 +162,16 @@ func (decoder *TransportDecoder) Process(input *bytes.Buffer) error {
 
 	isack := input.Len() == 0
 
-	err = decoder.validate(isack, remote, local)
+	ignore, err := decoder.validate(isack, remote, local)
 
 	decoder.data.messageReceived(isack, remote, local)
 
 	if err != nil {
 		return err
+	}
+
+	if ignore {
+		return nil
 	}
 
 	if isack {
@@ -202,26 +206,33 @@ func (decoder *TransportDecoder) dequeue() error {
 	return nil
 }
 
-func (decoder *TransportDecoder) validate(isack bool, remote int, local int) error {
+func (decoder *TransportDecoder) validate(isack bool, remote int, local int) (ignore bool, err error) {
+	ignore = false
+	err = nil
+
 	if !isack {
 		if remote == 0 {
 			if !decoder.data.firstMessage {
-				return fmt.Errorf("reset request")
+				err = fmt.Errorf("reset request")
+				return
 			}
 		} else {
 			if remote == decoder.data.remoteSequenceNumber {
 				logger.Warnf("Repeated sequence number %d: ignoring message", remote)
-				return nil
+				ignore = true
+				return
 			}
 			if remote != decoder.data.computeNext(decoder.data.remoteSequenceNumber) {
-				return fmt.Errorf("unexpected sequence number: %d instead of %d", remote, decoder.data.computeNext(decoder.data.remoteSequenceNumber))
+				err = fmt.Errorf("unexpected sequence number: %d instead of %d", remote, decoder.data.computeNext(decoder.data.remoteSequenceNumber))
+				return
 			}
 		}
 	}
 
 	if local != decoder.data.sequenceNumber && local != decoder.data.prevSequenceNumber {
-		return fmt.Errorf("unexpected remote sequence number: %d instead of %d or %d", local, decoder.data.sequenceNumber, decoder.data.prevSequenceNumber)
+		err = fmt.Errorf("unexpected remote sequence number: %d instead of %d or %d", local, decoder.data.sequenceNumber, decoder.data.prevSequenceNumber)
+		return
 	}
 
-	return nil
+	return
 }
