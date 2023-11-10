@@ -16,10 +16,12 @@ type transactionResponse struct {
 }
 
 type transaction struct {
-	appSeq   uint8
-	cmdCode  uint16
-	reqData  any
-	response chan transactionResponse
+	appSeq       uint8
+	cmdCode      uint16
+	reqData      any
+	response     chan transactionResponse
+	responseDone bool
+	responseMux  sync.Mutex
 }
 
 func makeTransaction(cmd commands.CommandWithAppSeq) *transaction {
@@ -62,9 +64,7 @@ func (trans *transaction) TryResponse(cmd commands.Command) bool {
 				err: fmt.Errorf("error %d received", cmd.ErrorCode),
 			}
 
-			trans.response <- resp
-			close(trans.response)
-			return true
+			return trans.setResponse(resp)
 		}
 
 	case *commands.Response:
@@ -74,9 +74,7 @@ func (trans *transaction) TryResponse(cmd commands.Command) bool {
 				resp.err = fmt.Errorf("response with error code %s received", cmd.CodeString())
 			}
 			// else no error but response with no additional data
-			trans.response <- resp
-			close(trans.response)
-			return true
+			return trans.setResponse(resp)
 		}
 
 	case commands.ResponseData:
@@ -85,9 +83,7 @@ func (trans *transaction) TryResponse(cmd commands.Command) bool {
 				cmd: cmd,
 			}
 
-			trans.response <- resp
-			close(trans.response)
-			return true
+			return trans.setResponse(resp)
 		}
 	}
 
@@ -95,13 +91,27 @@ func (trans *transaction) TryResponse(cmd commands.Command) bool {
 }
 
 // connection side
-func (trans *transaction) Cancel() {
+func (trans *transaction) Cancel() bool {
 	resp := transactionResponse{
 		err: fmt.Errorf("transaction canceled"),
 	}
 
+	return trans.setResponse(resp)
+}
+
+func (trans *transaction) setResponse(resp transactionResponse) bool {
+	trans.responseMux.Lock()
+	defer trans.responseMux.Unlock()
+
+	if trans.responseDone {
+		return false
+	}
+
 	trans.response <- resp
 	close(trans.response)
+	trans.responseDone = true
+
+	return true
 }
 
 type transactionManager struct {
