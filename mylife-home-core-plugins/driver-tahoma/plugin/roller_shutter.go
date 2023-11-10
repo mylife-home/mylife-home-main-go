@@ -6,6 +6,7 @@ import (
 	"mylife-home-core-plugins-driver-tahoma/engine"
 	"reflect"
 	"strconv"
+	"sync"
 )
 
 // @Plugin(description="Volet roulant Somfy" usage="actuator")
@@ -26,31 +27,49 @@ type RollerShutter struct {
 	// @State(type="range[0;100]")
 	Value definitions.State[int64]
 
-	store                   *engine.Store
-	storeOnlineChangedToken tools.RegistrationToken
-	storeDeviceChangedToken tools.RegistrationToken
-	storeStateChangedToken  tools.RegistrationToken
-	storeExecChangedToken   tools.RegistrationToken
+	store                  *engine.Store
+	storeOnlineChangedChan chan bool
+	storeDeviceChangedChan chan *engine.DeviceChange
+	storeStateChangedChan  chan *engine.DeviceState
+	storeExecChangedChan   chan *engine.ExecChange
+
+	storeOnline bool
+	device      *engine.Device
+	onlineMux   sync.Mutex
 }
 
 func (component *RollerShutter) Init(runtime definitions.Runtime) error {
 	component.store = engine.GetStore(component.BoxKey)
 
-	component.storeOnlineChangedToken = component.store.OnOnlineChanged().Register(component.handleOnlineChanged)
-	component.storeDeviceChangedToken = component.store.OnDeviceChanged().Register(component.handleDeviceChanged)
-	component.storeStateChangedToken = component.store.OnStateChanged().Register(component.handleStateChanged)
-	component.storeExecChangedToken = component.store.OnExecChanged().Register(component.handleExecChanged)
+	component.storeOnlineChangedChan = make(chan bool)
+	component.storeDeviceChangedChan = make(chan *engine.DeviceChange)
+	component.storeStateChangedChan = make(chan *engine.DeviceState)
+	component.storeExecChangedChan = make(chan *engine.ExecChange)
 
-	component.refreshOnline()
+	tools.DispatchChannel(component.storeOnlineChangedChan, component.handleOnlineChanged)
+	tools.DispatchChannel(component.storeDeviceChangedChan, component.handleDeviceChanged)
+	tools.DispatchChannel(component.storeStateChangedChan, component.handleStateChanged)
+	tools.DispatchChannel(component.storeExecChangedChan, component.handleExecChanged)
+
+	component.store.Online().Subscribe(component.storeOnlineChangedChan, true)
+	component.store.OnDeviceChanged().Subscribe(component.storeDeviceChangedChan)
+	component.store.OnStateChanged().Subscribe(component.storeStateChangedChan)
+	component.store.OnExecChanged().Subscribe(component.storeExecChangedChan)
 
 	return nil
 }
 
 func (component *RollerShutter) Terminate() {
-	component.store.OnOnlineChanged().Unregister(component.storeOnlineChangedToken)
-	component.store.OnDeviceChanged().Unregister(component.storeDeviceChangedToken)
-	component.store.OnStateChanged().Unregister(component.storeStateChangedToken)
-	component.store.OnExecChanged().Unregister(component.storeExecChangedToken)
+
+	component.store.Online().Unsubscribe(component.storeOnlineChangedChan)
+	component.store.OnDeviceChanged().Unsubscribe(component.storeDeviceChangedChan)
+	component.store.OnStateChanged().Unsubscribe(component.storeStateChangedChan)
+	component.store.OnExecChanged().Unsubscribe(component.storeExecChangedChan)
+
+	close(component.storeOnlineChangedChan)
+	close(component.storeDeviceChangedChan)
+	close(component.storeStateChangedChan)
+	close(component.storeExecChangedChan)
 
 	component.store = nil
 	engine.ReleaseStore(component.BoxKey)
@@ -99,11 +118,42 @@ func (component *RollerShutter) Interrupt(arg bool) {
 }
 
 func (component *RollerShutter) handleOnlineChanged(online bool) {
-	go component.refreshOnline()
+	component.onlineMux.Lock()
+	defer component.onlineMux.Unlock()
+
+	component.storeOnline = online
+
+	component.refreshOnline()
 }
 
 func (component *RollerShutter) handleDeviceChanged(arg *engine.DeviceChange) {
-	go component.refreshOnline()
+	device := arg.Device()
+	if device.DeviceURL() != component.DeviceURL {
+		return
+	}
+
+	component.onlineMux.Lock()
+	defer component.onlineMux.Unlock()
+
+	switch arg.Operation() {
+	case engine.OperationAdd:
+		component.device = device
+	case engine.OperationRemove:
+		component.device = nil
+	}
+
+	component.refreshOnline()
+}
+
+func (component *RollerShutter) refreshOnline() {
+	online := component.storeOnline && component.device != nil
+
+	component.Online.Set(online)
+
+	if !online {
+		component.Value.Set(0)
+		component.Exec.Set(false)
+	}
 }
 
 func (component *RollerShutter) handleStateChanged(state *engine.DeviceState) {
@@ -154,22 +204,5 @@ func (component *RollerShutter) handleStateChanged(state *engine.DeviceState) {
 func (component *RollerShutter) handleExecChanged(arg *engine.ExecChange) {
 	if arg.DeviceURL() == component.DeviceURL {
 		component.Exec.Set(arg.Executing())
-	}
-}
-
-func (component *RollerShutter) refreshOnline() {
-	store := component.store
-	if store == nil {
-		// refreshOnline called in a goroutine, we have exited before
-		return
-	}
-
-	online := store.Online() && store.GetDevice(component.DeviceURL) != nil
-
-	component.Online.Set(online)
-
-	if !online {
-		component.Value.Set(0)
-		component.Exec.Set(false)
 	}
 }

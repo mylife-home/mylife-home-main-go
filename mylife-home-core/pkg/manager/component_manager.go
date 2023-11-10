@@ -3,7 +3,6 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
-	"mylife-home-common/bus"
 	"mylife-home-common/components"
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/instance_info"
@@ -16,34 +15,22 @@ import (
 )
 
 type componentManager struct {
-	transport        *bus.Transport
-	supportsBindings bool
-	registry         *components.Registry
-	publisher        *busPublisher
+	registry         components.Registry
 	store            *store.Store
+	supportsBindings bool
 	components       map[string]*plugins.Component
 	bindings         map[string]*binding
 }
 
-func makeComponentManager(transport *bus.Transport) *componentManager {
-	store := store.MakeStore()
+func makeComponentManager(registry components.Registry, supportsBindings bool) *componentManager {
 
 	manager := &componentManager{
-		transport:  transport,
-		store:      store,
-		components: make(map[string]*plugins.Component),
-		bindings:   make(map[string]*binding),
+		registry:         registry,
+		store:            store.MakeStore(),
+		supportsBindings: supportsBindings,
+		components:       make(map[string]*plugins.Component),
+		bindings:         make(map[string]*binding),
 	}
-
-	manager.supportsBindings = manager.transport.Presence().Tracking()
-
-	options := components.NewRegistryOptions()
-	if manager.supportsBindings {
-		options.PublishRemoteComponents(manager.transport)
-	}
-	manager.registry = components.NewRegistry(options)
-
-	manager.publisher = newBusPublisher(manager.transport, manager.registry)
 
 	instance_info.AddCapability("components-manager")
 	if manager.supportsBindings {
@@ -95,13 +82,6 @@ func (manager *componentManager) Terminate() {
 		component.Terminate()
 	}
 	clear(manager.components)
-
-	manager.publisher.Terminate()
-	manager.registry.Terminate()
-}
-
-func (manager *componentManager) SupportsBindings() bool {
-	return manager.supportsBindings
 }
 
 func (manager *componentManager) AddComponent(id string, plugin string, config map[string]json.RawMessage) error {

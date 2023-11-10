@@ -12,7 +12,6 @@ import (
 
 	"mylife-home-common/config"
 	"mylife-home-common/defines"
-	"mylife-home-common/executor"
 	"mylife-home-common/instance_info"
 	"mylife-home-common/log"
 )
@@ -21,8 +20,6 @@ var logger = log.CreateLogger("mylife:home:core:main")
 
 var configFile string
 var logConsole bool
-
-var m *manager.Manager
 
 var rootCmd = &cobra.Command{
 	Use:   "mylife-home-core",
@@ -34,36 +31,16 @@ func run(_ *cobra.Command, _ []string) {
 	defines.Init("core", version.Value)
 	log.Init(logConsole)
 	config.Init(configFile)
+	instance_info.Init()
 	plugins.Build()
 
-	executor.Run(
-		setupSignals,
-		instance_info.Init,
-		setupManager)
-}
+	m := manager.MakeManager()
 
-func setupSignals() {
 	channel := make(chan os.Signal, 1)
-
 	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)
+	<-channel
 
-	go func() {
-		s := <-channel
-		signal.Reset(syscall.SIGINT, syscall.SIGTERM)
-		logger.Debugf("Got signal %s", s)
-
-		exit()
-	}()
-}
-
-func setupManager() {
-	m = manager.MakeManager()
-}
-
-func exit() {
-	logger.Debug("Exit initiated")
-	executor.Execute(m.Terminate)
-	executor.Stop(false)
+	m.Terminate()
 }
 
 func init() {

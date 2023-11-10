@@ -2,10 +2,13 @@ package components
 
 import (
 	"fmt"
-	"mylife-home-common/bus"
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/log"
 	"mylife-home-common/tools"
+	"sync"
+
+	"github.com/gookit/goutil/errorx/panics"
+	"golang.org/x/exp/maps"
 )
 
 var logger = log.CreateLogger("mylife:home:components:registry")
@@ -53,221 +56,237 @@ func (change *PluginChange) Plugin() *metadata.Plugin {
 	return change.plugin
 }
 
-type RegistryOptions struct {
-	listenRemoteComponents bool
-	transport              *bus.Transport
+type ComponentData interface {
+	InstanceName() string
+	Component() Component
 }
 
-func NewRegistryOptions() *RegistryOptions {
-	return &RegistryOptions{}
-}
+type Registry interface {
+	OnComponentChange() tools.Observable[*ComponentChange]
+	OnPluginChange() tools.Observable[*PluginChange]
 
-func (options *RegistryOptions) PublishRemoteComponents(transport *bus.Transport) *RegistryOptions {
-	options.listenRemoteComponents = true
-	options.transport = transport
-	return options
+	AddPlugin(instanceName string, plugin *metadata.Plugin)
+	RemovePlugin(instanceName string, plugin *metadata.Plugin)
+	HasPlugin(instanceName string, id string) bool
+	GetPlugin(instanceName string, id string) *metadata.Plugin
+	GetPlugins(instanceName string) []*metadata.Plugin
+
+	AddComponent(instanceName string, component Component)
+	RemoveComponent(instanceName string, component Component)
+	HasComponent(id string) bool
+	GetComponent(id string) Component
+	GetComponentData(id string) ComponentData
+	GetComponentsData() []ComponentData
+	GetComponents() []Component
+
+	GetInstanceNames() []string
 }
 
 type instanceData struct {
-	plugins    map[*metadata.Plugin]struct{}
-	components map[Component]struct{}
+	plugins    map[string]*metadata.Plugin
+	components map[string]Component
 }
 
-type ComponentData struct {
+var _ ComponentData = (*componentData)(nil)
+
+type componentData struct {
 	instanceName string
 	component    Component
 }
 
-func (data *ComponentData) InstanceName() string {
+func (data *componentData) InstanceName() string {
 	return data.instanceName
 }
 
-func (data *ComponentData) Component() Component {
+func (data *componentData) Component() Component {
 	return data.component
 }
 
-type Registry struct {
-	onComponentChange  *tools.CallbackManager[*ComponentChange]
-	onPluginChange     *tools.CallbackManager[*PluginChange]
-	components         map[string]*ComponentData
-	pluginsPerInstance map[string]*metadata.Plugin
-	instances          map[string]*instanceData
-	publisher          *busListener
+var _ Registry = (*registry)(nil)
+
+type registry struct {
+	onComponentChange tools.Subject[*ComponentChange]
+	onPluginChange    tools.Subject[*PluginChange]
+
+	components map[string]*componentData
+	instances  map[string]*instanceData
+
+	mux sync.Mutex
 }
 
-func NewRegistry(options *RegistryOptions) *Registry {
-	registry := &Registry{
-		onComponentChange:  tools.NewCallbackManager[*ComponentChange](),
-		onPluginChange:     tools.NewCallbackManager[*PluginChange](),
-		components:         make(map[string]*ComponentData),
-		pluginsPerInstance: make(map[string]*metadata.Plugin),
-		instances:          make(map[string]*instanceData),
-	}
-
-	if options.listenRemoteComponents {
-		registry.publisher = newBusPublisher(options.transport, registry)
-	}
-
-	return registry
-}
-
-func (reg *Registry) Terminate() {
-	if reg.publisher != nil {
-		reg.publisher.Terminate()
+func NewRegistry() Registry {
+	return &registry{
+		onComponentChange: tools.MakeSubject[*ComponentChange](),
+		onPluginChange:    tools.MakeSubject[*PluginChange](),
+		components:        make(map[string]*componentData),
+		instances:         make(map[string]*instanceData),
 	}
 }
 
-func (reg *Registry) PublishingRemoteComponents() bool {
-	return reg.publisher != nil
-}
-
-func (reg *Registry) OnComponentChange() tools.CallbackRegistration[*ComponentChange] {
+func (reg *registry) OnComponentChange() tools.Observable[*ComponentChange] {
 	return reg.onComponentChange
 }
 
-func (reg *Registry) OnPluginChange() tools.CallbackRegistration[*PluginChange] {
+func (reg *registry) OnPluginChange() tools.Observable[*PluginChange] {
 	return reg.onPluginChange
 }
 
-func (reg *Registry) AddPlugin(instanceName string, plugin *metadata.Plugin) {
-	key := reg.buildPluginId(instanceName, plugin)
-	if _, exists := reg.pluginsPerInstance[key]; exists {
-		panic(fmt.Errorf("plugin '%s' does already exist in the registry", key))
-	}
+func (reg *registry) AddPlugin(instanceName string, plugin *metadata.Plugin) {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
 
-	reg.pluginsPerInstance[key] = plugin
+	id := plugin.Id()
+	logId := reg.buildLogId(instanceName, id)
+
 	reg.updateInstance(instanceName, func(data *instanceData) {
-		data.plugins[plugin] = struct{}{}
+		_, exists := data.plugins[id]
+		panics.IsTrue(!exists, "plugin '%s' does already exist in the registry", logId)
+
+		data.plugins[id] = plugin
 	})
 
-	logger.Debugf("Plugin '%s' added", key)
+	logger.Debugf("Plugin '%s' added", logId)
 
-	reg.onPluginChange.Execute(&PluginChange{
+	reg.onPluginChange.Notify(&PluginChange{
 		action:       RegistryAdd,
 		instanceName: instanceName,
 		plugin:       plugin,
 	})
 }
 
-func (reg *Registry) RemovePlugin(instanceName string, plugin *metadata.Plugin) {
-	key := reg.buildPluginId(instanceName, plugin)
-	if _, exists := reg.pluginsPerInstance[key]; !exists {
-		panic(fmt.Errorf("plugin '%s' does not exist in the registry", key))
-	}
+func (reg *registry) RemovePlugin(instanceName string, plugin *metadata.Plugin) {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
 
-	delete(reg.pluginsPerInstance, key)
+	id := plugin.Id()
+	logId := reg.buildLogId(instanceName, id)
+
 	reg.updateInstance(instanceName, func(data *instanceData) {
-		delete(data.plugins, plugin)
+		_, exists := data.plugins[id]
+		panics.IsTrue(exists, "plugin '%s' does not exist in the registry", logId)
+
+		delete(data.plugins, id)
 	})
 
-	logger.Debugf("Plugin '%s' removed", key)
-
-	reg.onPluginChange.Execute(&PluginChange{
+	logger.Debugf("Plugin '%s' removed", logId)
+	reg.onPluginChange.Notify(&PluginChange{
 		action:       RegistryRemove,
 		instanceName: instanceName,
 		plugin:       plugin,
 	})
 }
 
-func (reg *Registry) buildPluginId(instanceName string, plugin *metadata.Plugin) string {
-	if instanceName == "" {
-		instanceName = "local"
-	}
-
-	return instanceName + ":" + plugin.Id()
-}
-
-func (reg *Registry) updateInstance(instanceName string, callback func(*instanceData)) {
+func (reg *registry) updateInstance(instanceName string, callback func(*instanceData)) {
 	data := reg.instances[instanceName]
 	if data == nil {
 		data = &instanceData{
-			plugins:    make(map[*metadata.Plugin]struct{}),
-			components: make(map[Component]struct{}),
+			plugins:    make(map[string]*metadata.Plugin),
+			components: make(map[string]Component),
 		}
 
 		reg.instances[instanceName] = data
+		logger.Debugf("Instance '%s' added", instanceName)
 	}
 
 	callback(data)
 
 	if len(data.plugins) == 0 && len(data.components) == 0 {
 		delete(reg.instances, instanceName)
+		logger.Debugf("Instance '%s' removed", instanceName)
 	}
 }
 
-func (reg *Registry) HasPlugin(instanceName string, id string) bool {
+func (reg *registry) HasPlugin(instanceName string, id string) bool {
 	return reg.GetPlugin(instanceName, id) != nil
 }
 
-func (reg *Registry) GetPlugin(instanceName string, id string) *metadata.Plugin {
-	if instanceName == "" {
-		instanceName = "local"
+func (reg *registry) GetPlugin(instanceName string, id string) *metadata.Plugin {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
+
+	instance := reg.instances[instanceName]
+	if instance == nil {
+		return nil
 	}
 
-	key := instanceName + ":" + id
-	return reg.pluginsPerInstance[key]
+	return instance.plugins[id]
 }
 
-func (reg *Registry) GetPlugins(instanceName string) tools.ReadonlySlice[*metadata.Plugin] {
-	data := reg.instances[instanceName]
-	plugins := make([]*metadata.Plugin, 0)
-	if data != nil {
-		for plugin := range data.plugins {
-			plugins = append(plugins, plugin)
-		}
+func (reg *registry) GetPlugins(instanceName string) []*metadata.Plugin {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
+
+	instance := reg.instances[instanceName]
+	if instance == nil {
+		return []*metadata.Plugin{}
 	}
 
-	return tools.NewReadonlySlice[*metadata.Plugin](plugins)
+	return maps.Values(instance.plugins)
 }
 
-func (reg *Registry) AddComponent(instanceName string, component Component) {
+func (reg *registry) AddComponent(instanceName string, component Component) {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
+
 	id := component.Id()
+	logId := reg.buildLogId(instanceName, component.Id())
+
 	if _, exists := reg.components[id]; exists {
 		panic(fmt.Errorf("Component '%s' does already exist in the registry", id))
 	}
 
-	reg.components[id] = &ComponentData{
+	reg.components[id] = &componentData{
 		instanceName: instanceName,
 		component:    component,
 	}
 
 	reg.updateInstance(instanceName, func(data *instanceData) {
-		data.components[component] = struct{}{}
+		data.components[id] = component
 	})
 
-	logger.Debugf("Component '%s:%s' added", instanceName, id)
-	reg.onComponentChange.Execute(&ComponentChange{
+	logger.Debugf("Component '%s' added", logId)
+
+	reg.onComponentChange.Notify(&ComponentChange{
 		action:       RegistryAdd,
 		instanceName: instanceName,
 		component:    component,
 	})
 }
 
-func (reg *Registry) RemoveComponent(instanceName string, component Component) {
+func (reg *registry) RemoveComponent(instanceName string, component Component) {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
+
 	id := component.Id()
+	logId := reg.buildLogId(instanceName, component.Id())
+
 	if _, exists := reg.components[id]; !exists {
 		panic(fmt.Errorf("Component '%s' does not exist in the registry", id))
 	}
 
 	delete(reg.components, id)
 	reg.updateInstance(instanceName, func(data *instanceData) {
-		delete(data.components, component)
+		delete(data.components, id)
 	})
 
-	logger.Debugf("Component '%s:%s' removed", instanceName, id)
-	reg.onComponentChange.Execute(&ComponentChange{
+	logger.Debugf("Component '%s' removed", logId)
+
+	reg.onComponentChange.Notify(&ComponentChange{
 		action:       RegistryRemove,
 		instanceName: instanceName,
 		component:    component,
 	})
 }
 
-func (reg *Registry) HasComponent(id string) bool {
+func (reg *registry) HasComponent(id string) bool {
 	return reg.GetComponentData(id) != nil
 }
 
-func (reg *Registry) GetComponent(id string) Component {
-	data := reg.GetComponentData(id)
+func (reg *registry) GetComponent(id string) Component {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
+
+	data := reg.components[id]
 	if data == nil {
 		return nil
 	} else {
@@ -275,36 +294,60 @@ func (reg *Registry) GetComponent(id string) Component {
 	}
 }
 
-func (reg *Registry) GetComponentData(id string) *ComponentData {
-	return reg.components[id]
+func (reg *registry) GetComponentData(id string) ComponentData {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
+
+	compData, exists := reg.components[id]
+	if exists {
+		return compData
+	} else {
+		// Mandatory to return a nil value as interface
+		return nil
+	}
 }
 
-func (reg *Registry) GetComponentsData() tools.ReadonlySlice[*ComponentData] {
-	components := make([]*ComponentData, 0, len(reg.components))
+func (reg *registry) GetComponentsData() []ComponentData {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
 
+	components := make([]ComponentData, len(reg.components))
+
+	index := 0
 	for _, data := range reg.components {
-		components = append(components, data)
+		components[index] = data
+		index += 1
 	}
 
-	return tools.NewReadonlySlice[*ComponentData](components)
+	return components
 }
 
-func (reg *Registry) GetComponents() tools.ReadonlySlice[Component] {
-	components := make([]Component, 0, len(reg.components))
+func (reg *registry) GetComponents() []Component {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
 
+	components := make([]Component, len(reg.components))
+
+	index := 0
 	for _, data := range reg.components {
-		components = append(components, data.component)
+		components[index] = data.component
+		index += 1
 	}
 
-	return tools.NewReadonlySlice[Component](components)
+	return components
 }
 
-func (reg *Registry) GetInstanceNames() tools.ReadonlySlice[string] {
-	instances := make([]string, 0, len(reg.instances))
+func (reg *registry) GetInstanceNames() []string {
+	reg.mux.Lock()
+	defer reg.mux.Unlock()
 
-	for instanceName := range reg.instances {
-		instances = append(instances, instanceName)
+	return maps.Keys(reg.instances)
+}
+
+func (reg *registry) buildLogId(instanceName string, id string) string {
+	if instanceName == "" {
+		return "<local>:" + id
+	} else {
+		return instanceName + ":" + id
 	}
-
-	return tools.NewReadonlySlice[string](instances)
 }

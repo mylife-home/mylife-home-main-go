@@ -2,11 +2,11 @@ package manager
 
 import (
 	"mylife-home-common/bus"
+	"mylife-home-common/components"
 	"mylife-home-common/config"
 	"mylife-home-common/instance_info"
 	"mylife-home-common/log"
 	"mylife-home-core/pkg/plugins"
-	"mylife-home-core/pkg/store"
 )
 
 var logger = log.CreateLogger("mylife:home:core:manager")
@@ -17,7 +17,11 @@ type managerConfig struct {
 
 type Manager struct {
 	transport *bus.Transport
+	registry  components.Registry
 	cm        *componentManager
+	api       *rpcApi
+	publisher components.BusPublisher
+	listener  components.BusListener
 }
 
 func MakeManager() *Manager {
@@ -25,52 +29,35 @@ func MakeManager() *Manager {
 	config.BindStructure("manager", &conf)
 
 	supportsBindings := conf.SupportsBindings
-	transport := bus.NewTransport(bus.NewOptions().SetPresenceTracking(supportsBindings))
-	cm := makeComponentManager(transport)
 
-	manager := &Manager{
-		transport: transport,
-		cm:        cm,
-	}
+	manager := &Manager{}
 
+	// static?
 	manager.addPluginsInstanceInfo()
 
-	manager.transport.Rpc().Serve("components.add", bus.NewRpcServiceSync(manager.rpcComponentAdd))
-	manager.transport.Rpc().Serve("components.remove", bus.NewRpcServiceSync(manager.rpcComponentRemove))
-	manager.transport.Rpc().Serve("components.list", bus.NewRpcServiceSync(manager.rpcComponentList))
+	manager.transport = bus.NewTransport()
+	manager.registry = components.NewRegistry()
+	manager.cm = makeComponentManager(manager.registry, supportsBindings)
+	manager.api = makeRpcApi(manager.transport, manager.cm, supportsBindings)
+	manager.publisher = components.PublishBus(manager.transport, manager.registry)
 
-	instance_info.AddCapability("components-api")
-
-	if manager.cm.SupportsBindings() {
-		manager.transport.Rpc().Serve("bindings.add", bus.NewRpcServiceSync(manager.rpcBindingAdd))
-		manager.transport.Rpc().Serve("bindings.remove", bus.NewRpcServiceSync(manager.rpcBindingRemove))
-		manager.transport.Rpc().Serve("bindings.list", bus.NewRpcServiceSync(manager.rpcBindingList))
-
-		instance_info.AddCapability("bindings-api")
+	if supportsBindings {
+		manager.listener = components.ListenBus(manager.transport, manager.registry)
 	}
-
-	manager.transport.Rpc().Serve("store.save", bus.NewRpcServiceAsync(manager.rpcStoreSave))
-
-	instance_info.AddCapability("store-api")
 
 	return manager
 }
 
 func (manager *Manager) Terminate() {
 
-	manager.transport.Rpc().Unserve("components.add")
-	manager.transport.Rpc().Unserve("components.remove")
-	manager.transport.Rpc().Unserve("components.list")
-
-	if manager.cm.SupportsBindings() {
-		manager.transport.Rpc().Unserve("bindings.add")
-		manager.transport.Rpc().Unserve("bindings.remove")
-		manager.transport.Rpc().Unserve("bindings.list")
+	if manager.listener != nil {
+		manager.listener.Terminate()
 	}
 
-	manager.transport.Rpc().Unserve("store.save")
-
+	manager.publisher.Terminate()
+	manager.api.Terminate()
 	manager.cm.Terminate()
+	//manager.registry.Terminate()
 	manager.transport.Terminate()
 }
 
@@ -84,41 +71,4 @@ func (manager *Manager) addPluginsInstanceInfo() {
 	for module, version := range modules {
 		instance_info.AddComponent("core-plugins-"+module, version)
 	}
-}
-
-func (manager *Manager) rpcComponentAdd(config *store.ComponentConfig) (struct{}, error) {
-	err := manager.cm.AddComponent(config.Id, config.Plugin, config.Config)
-	return struct{}{}, err
-}
-
-func (manager *Manager) rpcComponentRemove(input struct {
-	Id string `json:"id"`
-}) (struct{}, error) {
-	err := manager.cm.RemoveComponent(input.Id)
-	return struct{}{}, err
-}
-
-func (manager *Manager) rpcComponentList(input struct{}) ([]*store.ComponentConfig, error) {
-	list := manager.cm.GetComponents()
-	return list, nil
-}
-
-func (manager *Manager) rpcBindingAdd(config *store.BindingConfig) (struct{}, error) {
-	err := manager.cm.AddBinding(config)
-	return struct{}{}, err
-}
-
-func (manager *Manager) rpcBindingRemove(config *store.BindingConfig) (struct{}, error) {
-	err := manager.cm.RemoveBinding(config)
-	return struct{}{}, err
-}
-
-func (manager *Manager) rpcBindingList(input struct{}) ([]*store.BindingConfig, error) {
-	list := manager.cm.GetBindings()
-	return list, nil
-}
-
-func (manager *Manager) rpcStoreSave(input struct{}) (struct{}, error) {
-	err := manager.cm.Save()
-	return struct{}{}, err
 }

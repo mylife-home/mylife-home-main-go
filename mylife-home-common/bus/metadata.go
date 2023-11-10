@@ -1,7 +1,9 @@
 package bus
 
 import (
+	"maps"
 	"mylife-home-common/tools"
+	"sync"
 )
 
 type ValueChangeType int
@@ -30,10 +32,10 @@ func (vs *ValueChange) Value() any {
 }
 
 type RemoteMetadataView interface {
-	OnChange() tools.CallbackRegistration[*ValueChange]
+	OnChange() tools.Observable[*ValueChange]
 
 	InstanceName() string
-	Values() tools.ReadonlyMap[string, any]
+	Values() map[string]any
 }
 
 const metadataDomain = "metadata"
@@ -48,62 +50,59 @@ func newMetadata(client *client) *Metadata {
 	}
 }
 
-func (meta *Metadata) Set(path string, value any) {
+func (meta *Metadata) Set(path string, value any) error {
 	topic := meta.client.BuildTopic(metadataDomain, path)
-
-	meta.client.Publish(topic, Encoding.WriteJson(value), true)
+	return meta.client.PublishRetain(topic, Encoding.WriteJson(value))
 }
 
-func (meta *Metadata) Clear(path string) {
+func (meta *Metadata) Clear(path string) error {
 	topic := meta.client.BuildTopic(metadataDomain, path)
-
-	meta.client.Publish(topic, []byte{}, true)
+	return meta.client.ClearRetain(topic)
 }
 
-func (meta *Metadata) CreateView(remoteInstanceName string) RemoteMetadataView {
+func (meta *Metadata) CreateView(remoteInstanceName string) (RemoteMetadataView, error) {
 	view := &remoteMetadataView{
 		client:       meta.client,
 		instanceName: remoteInstanceName,
-		onChange:     tools.NewCallbackManager[*ValueChange](),
+		onChange:     tools.MakeSubject[*ValueChange](),
 		registry:     make(map[string]any),
 	}
 
-	view.msgToken = view.client.OnMessage().Register(view.onMessage)
+	if err := view.client.Subscribe(view.listenTopic(), view.onMessage); err != nil {
+		return nil, err
+	}
 
-	view.client.Subscribe(view.listenTopic())
-
-	return view
+	return view, nil
 }
 
-func (meta *Metadata) CloseView(view RemoteMetadataView) {
+func (meta *Metadata) CloseView(view RemoteMetadataView) error {
 	viewImpl := view.(*remoteMetadataView)
-	viewImpl.client.OnMessage().Unregister(viewImpl.msgToken)
-
-	viewImpl.client.Unsubscribe(viewImpl.listenTopic())
+	return viewImpl.client.Unsubscribe(viewImpl.listenTopic())
 }
+
+var _ RemoteMetadataView = (*remoteMetadataView)(nil)
 
 type remoteMetadataView struct {
 	client       *client
 	msgToken     tools.RegistrationToken
 	instanceName string
-	onChange     *tools.CallbackManager[*ValueChange]
-	registry     map[string]any
+	onChange     tools.Subject[*ValueChange]
+
+	registry map[string]any
+	mux      sync.RWMutex
 }
 
 func (view *remoteMetadataView) onMessage(m *message) {
+	view.mux.Lock()
+	defer view.mux.Unlock()
 
-	if m.InstanceName() != view.instanceName || m.Domain() != metadataDomain {
-		return
-	}
-
-	// Note: onMessage is called from one goroutine, no need for map sync
 	if len(m.Payload()) == 0 {
 		delete(view.registry, m.Path())
-		view.onChange.Execute(&ValueChange{ValueClear, m.Path(), nil})
+		view.onChange.Notify(&ValueChange{ValueClear, m.Path(), nil})
 	} else {
 		value := Encoding.ReadJson(m.Payload())
 		view.registry[m.Path()] = value
-		view.onChange.Execute(&ValueChange{ValueSet, m.Path(), value})
+		view.onChange.Notify(&ValueChange{ValueSet, m.Path(), value})
 	}
 }
 
@@ -111,7 +110,7 @@ func (view *remoteMetadataView) listenTopic() string {
 	return view.client.BuildRemoteTopic(view.instanceName, metadataDomain, "#")
 }
 
-func (view *remoteMetadataView) OnChange() tools.CallbackRegistration[*ValueChange] {
+func (view *remoteMetadataView) OnChange() tools.Observable[*ValueChange] {
 	return view.onChange
 }
 
@@ -119,6 +118,9 @@ func (view *remoteMetadataView) InstanceName() string {
 	return view.instanceName
 }
 
-func (view *remoteMetadataView) Values() tools.ReadonlyMap[string, any] {
-	return tools.NewReadonlyMap[string, any](view.registry)
+func (view *remoteMetadataView) Values() map[string]any {
+	view.mux.RLock()
+	defer view.mux.RUnlock()
+
+	return maps.Clone(view.registry)
 }

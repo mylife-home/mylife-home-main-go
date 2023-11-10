@@ -4,6 +4,7 @@ import (
 	"mylife-home-common/tools"
 	"mylife-home-core-library/definitions"
 	"mylife-home-core-plugins-driver-tahoma/engine"
+	"sync"
 )
 
 // @Plugin(description="Portail coulissant Somfy" usage="actuator")
@@ -20,28 +21,42 @@ type SlidingGate struct {
 	// @State()
 	Exec definitions.State[bool]
 
-	store                   *engine.Store
-	storeOnlineChangedToken tools.RegistrationToken
-	storeDeviceChangedToken tools.RegistrationToken
-	storeExecChangedToken   tools.RegistrationToken
+	store                  *engine.Store
+	storeOnlineChangedChan chan bool
+	storeDeviceChangedChan chan *engine.DeviceChange
+	storeExecChangedChan   chan *engine.ExecChange
+
+	storeOnline bool
+	device      *engine.Device
+	onlineMux   sync.Mutex
 }
 
 func (component *SlidingGate) Init(runtime definitions.Runtime) error {
 	component.store = engine.GetStore(component.BoxKey)
 
-	component.storeOnlineChangedToken = component.store.OnOnlineChanged().Register(component.handleOnlineChanged)
-	component.storeDeviceChangedToken = component.store.OnDeviceChanged().Register(component.handleDeviceChanged)
-	component.storeExecChangedToken = component.store.OnExecChanged().Register(component.handleExecChanged)
+	component.storeOnlineChangedChan = make(chan bool)
+	component.storeDeviceChangedChan = make(chan *engine.DeviceChange)
+	component.storeExecChangedChan = make(chan *engine.ExecChange)
 
-	component.refreshOnline()
+	tools.DispatchChannel(component.storeOnlineChangedChan, component.handleOnlineChanged)
+	tools.DispatchChannel(component.storeDeviceChangedChan, component.handleDeviceChanged)
+	tools.DispatchChannel(component.storeExecChangedChan, component.handleExecChanged)
+
+	component.store.Online().Subscribe(component.storeOnlineChangedChan, true)
+	component.store.OnDeviceChanged().Subscribe(component.storeDeviceChangedChan)
+	component.store.OnExecChanged().Subscribe(component.storeExecChangedChan)
 
 	return nil
 }
 
 func (component *SlidingGate) Terminate() {
-	component.store.OnOnlineChanged().Unregister(component.storeOnlineChangedToken)
-	component.store.OnDeviceChanged().Unregister(component.storeDeviceChangedToken)
-	component.store.OnExecChanged().Unregister(component.storeExecChangedToken)
+	component.store.Online().Unsubscribe(component.storeOnlineChangedChan)
+	component.store.OnDeviceChanged().Unsubscribe(component.storeDeviceChangedChan)
+	component.store.OnExecChanged().Unsubscribe(component.storeExecChangedChan)
+
+	close(component.storeOnlineChangedChan)
+	close(component.storeDeviceChangedChan)
+	close(component.storeExecChangedChan)
 
 	component.store = nil
 	engine.ReleaseStore(component.BoxKey)
@@ -69,25 +84,45 @@ func (component *SlidingGate) Interrupt(arg bool) {
 }
 
 func (component *SlidingGate) handleOnlineChanged(online bool) {
-	go component.refreshOnline()
+	component.onlineMux.Lock()
+	defer component.onlineMux.Unlock()
+
+	component.storeOnline = online
+
+	component.refreshOnline()
 }
 
 func (component *SlidingGate) handleDeviceChanged(arg *engine.DeviceChange) {
-	go component.refreshOnline()
+	device := arg.Device()
+	if device.DeviceURL() != component.DeviceURL {
+		return
+	}
+
+	component.onlineMux.Lock()
+	defer component.onlineMux.Unlock()
+
+	switch arg.Operation() {
+	case engine.OperationAdd:
+		component.device = device
+	case engine.OperationRemove:
+		component.device = nil
+	}
+
+	component.refreshOnline()
+}
+
+func (component *SlidingGate) refreshOnline() {
+	online := component.storeOnline && component.device != nil
+
+	component.Online.Set(online)
+
+	if !online {
+		component.Exec.Set(false)
+	}
 }
 
 func (component *SlidingGate) handleExecChanged(arg *engine.ExecChange) {
 	if arg.DeviceURL() == component.DeviceURL {
 		component.Exec.Set(arg.Executing())
 	}
-}
-
-func (component *SlidingGate) refreshOnline() {
-	store := component.store
-	if store == nil {
-		// refreshOnline called in a goroutine, we have exited before
-		return
-	}
-
-	component.Online.Set(store.Online() && store.GetDevice(component.DeviceURL) != nil)
 }

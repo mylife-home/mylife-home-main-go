@@ -1,7 +1,6 @@
 package bus
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"mylife-home-common/log/publish"
@@ -12,52 +11,151 @@ import (
 
 const loggerDomain = "logger"
 
-const offlineRetention = 1024 * 1024
+const retention = 1024 * 1024
 
 type Logger struct {
-	client    *client
-	queue     chan *publish.LogEntry
-	onOffline func() // to set when offline, to cancel logsender routine
+	client   *client
+	listener chan *publish.LogEntry
+	queue    chan *publish.LogEntry
+	exit     chan struct{}
 }
 
 func newLogger(client *client) *Logger {
 	logger := &Logger{
-		client: client,
-		queue:  make(chan *publish.LogEntry, offlineRetention),
+		client:   client,
+		listener: make(chan *publish.LogEntry),
+		queue:    make(chan *publish.LogEntry, retention),
+		exit:     make(chan struct{}),
 	}
 
-	logger.client.OnOnlineChanged().Register(logger.onOnlineChange)
-	publish.OnEntry().Register(logger.onEntry)
+	go logger.pump()
+	publish.OnEntry().Subscribe(logger.listener)
+	go logger.writer()
 
 	return logger
 }
 
-func (logger *Logger) onOnlineChange(online bool) {
-	if online {
-		ctx, cancel := context.WithCancel(context.Background())
-		logger.onOffline = cancel
-		go logger.logSender(ctx)
-	} else {
-		// Stop routine when we go offline
-		logger.onOffline()
-	}
+func (logger *Logger) terminate() {
+	publish.OnEntry().Unsubscribe(logger.listener)
+	close(logger.listener)
+	close(logger.exit)
 }
 
-func (logger *Logger) logSender(ctx context.Context) {
-	for {
-		select {
-		case e := <-logger.queue:
-			logger.send(e)
-		case <-ctx.Done():
-			return
-		case <-logger.client.ctx.Done():
-			return
+func (logger *Logger) pump() {
+	for entry := range logger.listener {
+
+		// force enqueue. if full, drop message so that enqueue is OK
+		enqueued := false
+
+		for !enqueued {
+			select {
+			case logger.queue <- entry:
+				enqueued = true
+
+			default:
+				// Note: should log it, but it would cause more entries
+				fmt.Println("Logger queue full, dropping message")
+				<-logger.queue
+			}
 		}
 	}
 }
 
-func (logger *Logger) onEntry(e *publish.LogEntry) {
-	logger.queue <- e
+func (logger *Logger) writer() {
+	for {
+		select {
+
+		case <-logger.exit:
+			return
+
+		case entry := <-logger.queue:
+			logger.send(entry)
+		}
+	}
+}
+
+func (logger *Logger) send(entry *publish.LogEntry) {
+	payload, err := logger.serialize(entry)
+	if err != nil {
+		// Note: should log it, but it would cause more entries
+		fmt.Printf("Error marshaling log: '%f'\n", err)
+		return
+	}
+
+	topic := logger.client.BuildTopic(loggerDomain)
+
+	for {
+		select {
+
+		case <-logger.exit:
+			return
+
+		default:
+			if !logger.waitOnline() {
+				return
+			}
+
+			switch err := logger.client.Publish(topic, payload); {
+			case err == errClosing:
+				// retry
+
+			case err == nil:
+				return
+
+			default:
+				fmt.Printf("Error sending log: '%f'\n", err)
+				return
+			}
+		}
+	}
+}
+
+func (logger *Logger) waitOnline() bool {
+	ch := make(chan bool)
+
+	go func() {
+		// submit async else we will deadlock
+		logger.client.Online().Subscribe(ch, true)
+	}()
+	defer func() {
+		logger.client.Online().Unsubscribe(ch)
+	}()
+
+	for {
+		select {
+		case <-logger.exit:
+			return false
+
+		case online := <-ch:
+			if online {
+				return true
+			}
+		}
+	}
+}
+
+func (logger *Logger) serialize(entry *publish.LogEntry) ([]byte, error) {
+	data := jsonLog{
+		Name:         entry.LoggerName(),
+		InstanceName: logger.client.InstanceName(),
+		Hostname:     tools.Hostname(),
+		Pid:          os.Getpid(),
+		Level:        convertLevel(publish.LogLevel(entry.Level())),
+		Msg:          entry.Message(),
+		Time:         entry.Timestamp().Format(time.RFC3339),
+		V:            0,
+	}
+
+	if err := entry.Error(); err != nil {
+		data.Err = &jsonError{
+			Message: err.Message(),
+			Name:    "Error", // Go has no error name/type
+			Stack:   err.StackTrace(),
+		}
+	}
+
+	raw, err := json.Marshal(&data)
+	return raw, err
 }
 
 type jsonLog struct {
@@ -76,41 +174,6 @@ type jsonError struct {
 	Message string `json:"message"`
 	Name    string `json:"name"`
 	Stack   string `json:"stack"`
-}
-
-func (logger *Logger) send(e *publish.LogEntry) {
-	data := jsonLog{
-		Name:         e.LoggerName(),
-		InstanceName: logger.client.InstanceName(),
-		Hostname:     tools.Hostname(),
-		Pid:          os.Getpid(),
-		Level:        convertLevel(publish.LogLevel(e.Level())),
-		Msg:          e.Message(),
-		Time:         e.Timestamp().Format(time.RFC3339),
-		V:            0,
-	}
-
-	if ee := e.Error(); ee != nil {
-		data.Err = &jsonError{
-			Message: ee.Message(),
-			Name:    "Error", // Go has no error name/type
-			Stack:   ee.StackTrace(),
-		}
-	}
-
-	raw, err := json.Marshal(&data)
-	if err != nil {
-		// Note: should log it, but it would cause more entries
-		fmt.Printf("Error marshaling log: '%f'\n", err)
-		return
-	}
-
-	// Do not use classical queue, send logs sequentialy
-	token := logger.client.mqtt.Publish(logger.client.BuildTopic(loggerDomain), 0, false, raw)
-	token.Wait()
-	if err := token.Error(); err != nil {
-		fmt.Printf("Error sending log: '%f'\n", err)
-	}
 }
 
 func convertLevel(level publish.LogLevel) int {

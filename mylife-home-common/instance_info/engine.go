@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"mylife-home-common/defines"
-	"mylife-home-common/executor"
 	"mylife-home-common/log"
 	"mylife-home-common/tools"
 	"mylife-home-common/version"
@@ -12,6 +11,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/antichris/go-pirev"
@@ -19,46 +20,57 @@ import (
 
 var logger = log.CreateLogger("mylife:home:instance-info")
 
-var instanceInfo *InstanceInfo
-var listeners = tools.NewCallbackManager[*InstanceInfo]()
+var instanceInfo atomic.Pointer[InstanceInfo]
+var updateLock sync.Mutex // for read, atomic pointer is enough, but we don't want 2 updates to squizze info of each other
+var listeners = tools.MakeSubject[*InstanceInfo]()
 
 func Init() {
-	instanceInfo = create()
+	instanceInfo.Store(create())
 
-	executor.NewTicker(time.Minute, func() {
-		update(extractData(instanceInfo))
-	})
+	go func() {
+		for range time.Tick(time.Minute) {
+			// update will automatically also update uptimes
+			update(func(_ *instanceInfoData) {})
+		}
+	}()
 }
 
 func Get() *InstanceInfo {
-	return instanceInfo
+	return instanceInfo.Load()
 }
 
-func OnUpdate() tools.CallbackRegistration[*InstanceInfo] {
+func OnUpdate() tools.Observable[*InstanceInfo] {
 	return listeners
 }
 
-func update(newData *instanceInfoData) {
-	newData.SystemUptime = int64(tools.SystemUptime().Seconds())
-	newData.InstanceUptime = int64(tools.ApplicationUptime().Seconds())
+// Note: callback is executed from the update lock. It should not block.
+func update(callback func(data *instanceInfoData)) {
+	updateLock.Lock()
+	defer updateLock.Unlock()
 
-	instanceInfo = newInstanceInfo(newData)
+	data := extractData(instanceInfo.Load())
 
-	listeners.Execute(instanceInfo)
+	callback(data)
+
+	data.SystemUptime = int64(tools.SystemUptime().Seconds())
+	data.InstanceUptime = int64(tools.ApplicationUptime().Seconds())
+
+	newInfo := newInstanceInfo(data)
+
+	instanceInfo.Store(newInfo)
+	listeners.Notify(newInfo)
 }
 
 func AddComponent(componentName string, version string) {
-	newData := extractData(instanceInfo)
-	addComponentVersion(newData.Versions, componentName, version)
-
-	update(newData)
+	update(func(data *instanceInfoData) {
+		addComponentVersion(data.Versions, componentName, version)
+	})
 }
 
 func AddCapability(capability string) {
-	newData := extractData(instanceInfo)
-	newData.Capabilities = append(newData.Capabilities, capability)
-
-	update(newData)
+	update(func(data *instanceInfoData) {
+		data.Capabilities = append(data.Capabilities, capability)
+	})
 }
 
 func create() *InstanceInfo {

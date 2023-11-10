@@ -8,7 +8,7 @@ import (
 	"github.com/apex/log"
 )
 
-var onEntry = tools.NewCallbackManager[*LogEntry]()
+var onEntry = tools.MakeSubject[*LogEntry]()
 
 type LogLevel string
 
@@ -60,7 +60,7 @@ func (le *LogError) StackTrace() string {
 	return le.stacktrace
 }
 
-func OnEntry() tools.CallbackRegistration[*LogEntry] {
+func OnEntry() tools.Observable[*LogEntry] {
 	return onEntry
 }
 
@@ -82,7 +82,7 @@ func (h *Handler) HandleLog(e *log.Entry) error {
 		err:        convertError(e.Fields.Get("error")),
 	}
 
-	onEntry.Execute(entry)
+	onEntry.Notify(entry)
 
 	return nil
 }

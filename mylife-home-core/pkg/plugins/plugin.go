@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/log"
+	"mylife-home-common/tools"
 	"mylife-home-core-library/definitions"
 	"mylife-home-core-library/registry"
 	"reflect"
@@ -65,9 +66,14 @@ func (plugin *Plugin) Instantiate(id string, config map[string]any) (*Component,
 
 	// Prepare it
 	actions := make(map[string]func(any))
+	state := make(map[string]tools.ObservableValue[any])
 
 	for name, action := range plugin.actions {
 		actions[name] = action.init(compPtr)
+	}
+
+	for name, stateItem := range plugin.state {
+		state[name] = stateItem.init(compPtr)
 	}
 
 	for name, configItem := range plugin.config {
@@ -78,11 +84,7 @@ func (plugin *Plugin) Instantiate(id string, config map[string]any) (*Component,
 
 	target := compPtr.Interface().(definitions.Plugin)
 
-	comp := newComponent(id, plugin, target, actions)
-
-	for _, stateItem := range plugin.state {
-		stateItem.init(compPtr, comp)
-	}
+	comp := newComponent(id, plugin, target, actions, state)
 
 	logger.Infof("Component created: '%s'", comp.id)
 	logger.Debugf("Configuration applied (component='%s'): %+v", comp.id, config)
@@ -123,17 +125,13 @@ func makeStateItem(stateType *registry.StateType) *pluginStateItem {
 	}
 }
 
-func (s *pluginStateItem) init(compPtr reflect.Value, comp *Component) {
-	onEmit := func(value any) {
-		comp.stateChanged(s.meta.Name(), value)
-	}
-
-	var initialValue any
-	impl := makeStateImpl(s.meta.ValueType(), onEmit, &initialValue)
-	comp.state[s.meta.Name()] = initialValue
+func (s *pluginStateItem) init(compPtr reflect.Value) tools.ObservableValue[any] {
+	impl := makeStateImpl(s.meta.ValueType())
 
 	target := compPtr.Elem()
 	target.FieldByName(s.target.Name).Set(reflect.ValueOf(impl))
+
+	return impl.Value()
 }
 
 type pluginAction struct {

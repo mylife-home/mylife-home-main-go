@@ -1,195 +1,159 @@
 package bus
 
-import (
-	"fmt"
-	"mylife-home-common/tools"
-	"strings"
-)
-
 const componentsDomain = "components"
 
 type LocalComponent interface {
+	// Note: blocking
 	RegisterAction(name string, handler func([]byte))
+	// Note: blocking
 	SetState(name string, value []byte)
 }
 
 type RemoteComponent interface {
+	// Note: blocking
 	EmitAction(name string, value []byte)
+	// Note: blocking
 	RegisterStateChange(name string, handler func([]byte))
 }
 
 type Components struct {
-	client           *client
-	localComponents  map[string]*localComponentImpl
-	remoteComponents map[*remoteComponentImpl]struct{}
+	client *client
 }
 
 func newComponents(client *client) *Components {
 	return &Components{
-		client:           client,
-		localComponents:  make(map[string]*localComponentImpl),
-		remoteComponents: make(map[*remoteComponentImpl]struct{}),
+		client: client,
 	}
 }
 
-func (comps *Components) AddLocalComponent(id string) (LocalComponent, error) {
-	_, exists := comps.localComponents[id]
-	if exists {
-		return nil, fmt.Errorf("component with id '%s' does already exist", id)
-	}
-
-	component := newLocalComponent(comps.client, id)
-	comps.localComponents[id] = component
-	return component, nil
+// Note: automatically dropped on disconnection
+func (comps *Components) AddLocalComponent(id string) LocalComponent {
+	return newLocalComponent(comps.client, id)
 }
 
-func (comps *Components) GetLocalComponent(id string) LocalComponent {
-	return comps.localComponents[id]
-}
-
-func (comps *Components) RemoveLocalComponent(id string) {
-	component := comps.localComponents[id]
+// Note: blocking if connected
+func (comps *Components) RemoveLocalComponent(comp LocalComponent) {
+	component := comp.(*localComponent)
 
 	component.Terminate()
-	delete(comps.localComponents, id)
 }
 
+// Note: automatically dropped on disconnection
 func (comps *Components) TrackRemoteComponent(remoteInstanceName string, id string) RemoteComponent {
-	component := newRemoteComponent(comps.client, remoteInstanceName, id)
-	comps.remoteComponents[component] = struct{}{}
-	return component
+	return newRemoteComponent(comps.client, remoteInstanceName, id)
 }
 
-func (comps *Components) UntrackRemoteComponent(remoteComponent RemoteComponent) {
-	component := remoteComponent.(*remoteComponentImpl)
+// Note: blocking if connected
+func (comps *Components) UntrackRemoteComponent(remoteComp RemoteComponent) {
+	component := remoteComp.(*remoteComponent)
 	component.Terminate()
-	delete(comps.remoteComponents, component)
 }
 
 type dispatcher struct {
-	client        *client
-	instanceName  string
-	componentId   string
-	subscriptions map[string]func([]byte)
-	msgToken      tools.RegistrationToken
+	client       *client
+	instanceName string
+	componentId  string
+	topics       []string
 }
 
 func newDispatcher(client *client, instanceName string, componentId string) *dispatcher {
-	disp := &dispatcher{
-		client:        client,
-		instanceName:  instanceName,
-		componentId:   componentId,
-		subscriptions: make(map[string]func([]byte)),
+	return &dispatcher{
+		client:       client,
+		instanceName: instanceName,
+		componentId:  componentId,
+		topics:       make([]string, 0),
 	}
-
-	disp.msgToken = disp.client.OnMessage().Register(disp.onMessage)
-
-	return disp
 }
 
-func (disp *dispatcher) onMessage(m *message) {
-	if m.InstanceName() != disp.instanceName || m.Domain() != componentsDomain {
-		return
-	}
-
-	parts := strings.Split(m.Path(), "/")
-	if len(parts) != 2 {
-		return
-	}
-
-	componentId := parts[0]
-	memberName := parts[1]
-
-	if componentId != disp.componentId {
-		return
-	}
-
-	handler, exists := disp.subscriptions[memberName]
-	if !exists {
-		return
-	}
-
-	handler(m.Payload())
-}
-
+// Note: blocking
 func (disp *dispatcher) AddSubscription(member string, handler func([]byte)) {
-	if _, exists := disp.subscriptions[member]; exists {
-		panic(fmt.Errorf("member '%s' already registered", member))
+	topic := disp.buildTopic(member)
+
+	cb := func(m *message) {
+		handler(m.Payload())
 	}
 
-	disp.subscriptions[member] = handler
+	if err := disp.client.Subscribe(topic, cb); err != nil {
+		logger.WithError(err).Errorf("Could not subscribe topics: %+v", disp.topics)
+		return
+	}
 
-	disp.client.Subscribe(disp.buildTopic(member))
+	disp.topics = append(disp.topics, topic)
 }
 
+// Note: blocking
 func (disp *dispatcher) Terminate() {
-	disp.client.OnMessage().Unregister(disp.msgToken)
-
-	if len(disp.subscriptions) > 0 {
-		topics := make([]string, 0)
-
-		for member := range disp.subscriptions {
-			topics = append(topics, disp.buildTopic(member))
+	if len(disp.topics) > 0 {
+		if err := disp.client.Unsubscribe(disp.topics...); err != nil {
+			logger.WithError(err).Errorf("Could not unsubscribe topics: %+v", disp.topics)
 		}
-
-		disp.client.Unsubscribe(topics...)
 	}
 }
 
+// Note: blocking
 func (disp *dispatcher) Emit(memberName string, value []byte, persistent bool) {
 	topic := disp.buildTopic(memberName)
 
-	disp.client.Publish(topic, value, persistent)
+	var err error
+	if persistent {
+		err = disp.client.PublishRetain(topic, value)
+	} else {
+		err = disp.client.Publish(topic, value)
+	}
+
+	if err != nil {
+		logger.WithError(err).Errorf("Could not publish topic: %s", topic)
+	}
 }
 
 func (disp *dispatcher) buildTopic(member string) string {
 	return disp.client.BuildRemoteTopic(disp.instanceName, componentsDomain, disp.componentId, member)
 }
 
-var _ LocalComponent = (*localComponentImpl)(nil)
+var _ LocalComponent = (*localComponent)(nil)
 
-type localComponentImpl struct {
+type localComponent struct {
 	disp *dispatcher
 }
 
-func newLocalComponent(client *client, id string) *localComponentImpl {
-	return &localComponentImpl{
+func newLocalComponent(client *client, id string) *localComponent {
+	return &localComponent{
 		disp: newDispatcher(client, client.InstanceName(), id),
 	}
 }
 
-func (comp *localComponentImpl) Terminate() {
+func (comp *localComponent) Terminate() {
 	comp.disp.Terminate()
 }
 
-func (comp *localComponentImpl) RegisterAction(name string, handler func([]byte)) {
+func (comp *localComponent) RegisterAction(name string, handler func([]byte)) {
 	comp.disp.AddSubscription(name, handler)
 }
 
-func (comp *localComponentImpl) SetState(name string, value []byte) {
+func (comp *localComponent) SetState(name string, value []byte) {
 	comp.disp.Emit(name, value, true)
 }
 
-var _ RemoteComponent = (*remoteComponentImpl)(nil)
+var _ RemoteComponent = (*remoteComponent)(nil)
 
-type remoteComponentImpl struct {
+type remoteComponent struct {
 	disp *dispatcher
 }
 
-func newRemoteComponent(client *client, remoteInstanceName string, id string) *remoteComponentImpl {
-	return &remoteComponentImpl{
+func newRemoteComponent(client *client, remoteInstanceName string, id string) *remoteComponent {
+	return &remoteComponent{
 		disp: newDispatcher(client, remoteInstanceName, id),
 	}
 }
 
-func (comp *remoteComponentImpl) Terminate() {
+func (comp *remoteComponent) Terminate() {
 	comp.disp.Terminate()
 }
 
-func (comp *remoteComponentImpl) EmitAction(name string, value []byte) {
+func (comp *remoteComponent) EmitAction(name string, value []byte) {
 	comp.disp.Emit(name, value, false)
 }
 
-func (comp *remoteComponentImpl) RegisterStateChange(name string, handler func([]byte)) {
+func (comp *remoteComponent) RegisterStateChange(name string, handler func([]byte)) {
 	comp.disp.AddSubscription(name, handler)
 }

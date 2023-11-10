@@ -87,18 +87,19 @@ func (change *ExecChange) Executing() bool {
 }
 
 type Store struct {
-	client                   *Client
-	clientOnlineChangedToken tools.RegistrationToken
-	clientDeviceListToken    tools.RegistrationToken
-	clientStateRefreshToken  tools.RegistrationToken
-	clientExecRefreshToken   tools.RegistrationToken
+	client                  *Client
+	clientOnlineChangedChan chan bool
+	clientDeviceListChan    chan []kizcool.Device
+	clientStateRefreshChan  chan *StateRefresh
+	clientExecRefreshChan   chan *ExecChange
+	clientMux               sync.Mutex
 
 	devices         map[string]*Device
 	states          map[string]*DeviceState // key = <deviceURL>$<name>
-	onOnlineChanged *tools.CallbackManager[bool]
-	onDeviceChanged *tools.CallbackManager[*DeviceChange]
-	onStateChanged  *tools.CallbackManager[*DeviceState]
-	onExecChanged   *tools.CallbackManager[*ExecChange]
+	online          tools.SubjectValue[bool]
+	onDeviceChanged tools.Subject[*DeviceChange]
+	onStateChanged  tools.Subject[*DeviceState]
+	onExecChanged   tools.Subject[*ExecChange]
 
 	mux sync.Mutex
 }
@@ -107,56 +108,69 @@ func newStore() *Store {
 	return &Store{
 		devices:         make(map[string]*Device),
 		states:          make(map[string]*DeviceState),
-		onOnlineChanged: tools.NewCallbackManager[bool](),
-		onDeviceChanged: tools.NewCallbackManager[*DeviceChange](),
-		onStateChanged:  tools.NewCallbackManager[*DeviceState](),
-		onExecChanged:   tools.NewCallbackManager[*ExecChange](),
+		online:          tools.MakeSubjectValue[bool](false),
+		onDeviceChanged: tools.MakeSubject[*DeviceChange](),
+		onStateChanged:  tools.MakeSubject[*DeviceState](),
+		onExecChanged:   tools.MakeSubject[*ExecChange](),
 	}
 }
 
 func (store *Store) SetClient(client *Client) {
-	store.mux.Lock()
-	defer store.mux.Unlock()
+	store.clientMux.Lock()
+	defer store.clientMux.Unlock()
+
+	panics.IsTrue(store.client == nil)
 
 	store.client = client
-	store.clientOnlineChangedToken = store.client.OnOnlineChanged().Register(store.handleOnlineChanged)
-	store.clientDeviceListToken = store.client.OnDeviceList().Register(store.handleDeviceList)
-	store.clientStateRefreshToken = store.client.OnStateRefresh().Register(store.handleStateRefresh)
-	store.clientExecRefreshToken = store.client.OnExecRefresh().Register(store.handleExecRefresh)
 
-	if client.Online() {
-		store.onOnlineChanged.Execute(true)
-	}
+	store.clientOnlineChangedChan = make(chan bool)
+	store.clientDeviceListChan = make(chan []kizcool.Device)
+	store.clientStateRefreshChan = make(chan *StateRefresh)
+	store.clientExecRefreshChan = make(chan *ExecChange)
+
+	tools.DispatchChannel(store.clientOnlineChangedChan, store.handleOnlineChanged)
+	tools.DispatchChannel(store.clientDeviceListChan, store.handleDeviceList)
+	tools.DispatchChannel(store.clientStateRefreshChan, store.handleStateRefresh)
+	tools.DispatchChannel(store.clientExecRefreshChan, store.handleExecRefresh)
+
+	store.client.Online().Subscribe(store.clientOnlineChangedChan, true)
+	store.client.OnDeviceList().Subscribe(store.clientDeviceListChan)
+	store.client.OnStateRefresh().Subscribe(store.clientStateRefreshChan)
+	store.client.OnExecRefresh().Subscribe(store.clientExecRefreshChan)
+}
+
+func (store *Store) clearClient() {
+	store.clientMux.Lock()
+	defer store.clientMux.Unlock()
+
+	panics.IsTrue(store.client != nil)
+
+	store.client.Online().Unsubscribe(store.clientOnlineChangedChan)
+	store.client.OnDeviceList().Unsubscribe(store.clientDeviceListChan)
+	store.client.OnStateRefresh().Unsubscribe(store.clientStateRefreshChan)
+	store.client.OnExecRefresh().Unsubscribe(store.clientExecRefreshChan)
+
+	close(store.clientOnlineChangedChan)
+	close(store.clientDeviceListChan)
+	close(store.clientStateRefreshChan)
+	close(store.clientExecRefreshChan)
+
+	store.clientOnlineChangedChan = nil
+	store.clientDeviceListChan = nil
+	store.clientStateRefreshChan = nil
+	store.clientExecRefreshChan = nil
+
+	store.online.Update(false)
+
+	store.client = nil
 }
 
 func (store *Store) UnsetClient() {
+	store.clearClient()
+
 	store.mux.Lock()
 	defer store.mux.Unlock()
-
-	if store.client.Online() {
-		store.onOnlineChanged.Execute(false)
-
-		for _, device := range maps.Values(store.devices) {
-			delete(store.devices, device.DeviceURL())
-			store.onDeviceChanged.Execute(&DeviceChange{
-				device:    device,
-				operation: OperationRemove,
-			})
-		}
-
-		clear(store.states)
-	}
-
-	store.client.OnOnlineChanged().Unregister(store.clientOnlineChangedToken)
-	store.client.OnDeviceList().Unregister(store.clientDeviceListToken)
-	store.client.OnStateRefresh().Unregister(store.clientStateRefreshToken)
-	store.client.OnExecRefresh().Unregister(store.clientExecRefreshToken)
-
-	store.clientOnlineChangedToken = tools.InvalidRegistrationToken
-	store.clientDeviceListToken = tools.InvalidRegistrationToken
-	store.clientStateRefreshToken = tools.InvalidRegistrationToken
-	store.clientExecRefreshToken = tools.InvalidRegistrationToken
-	store.client = nil
+	store.clearDevices()
 }
 
 func (store *Store) Execute(deviceURL string, command string, args ...any) {
@@ -195,25 +209,20 @@ func (store *Store) Interrupt(deviceURL string) {
 	store.client.Interrupt(&device.kiz)
 }
 
-func (store *Store) OnOnlineChanged() tools.CallbackRegistration[bool] {
-	return store.onOnlineChanged
+func (store *Store) Online() tools.ObservableValue[bool] {
+	return store.online
 }
 
-func (store *Store) OnDeviceChanged() tools.CallbackRegistration[*DeviceChange] {
+func (store *Store) OnDeviceChanged() tools.Observable[*DeviceChange] {
 	return store.onDeviceChanged
 }
 
-func (store *Store) OnStateChanged() tools.CallbackRegistration[*DeviceState] {
+func (store *Store) OnStateChanged() tools.Observable[*DeviceState] {
 	return store.onStateChanged
 }
 
-func (store *Store) OnExecChanged() tools.CallbackRegistration[*ExecChange] {
+func (store *Store) OnExecChanged() tools.Observable[*ExecChange] {
 	return store.onExecChanged
-}
-
-func (store *Store) Online() bool {
-	client := store.client
-	return client != nil && client.Online()
 }
 
 func (store *Store) GetDevice(deviceURL string) *Device {
@@ -236,7 +245,7 @@ func (store *Store) makeStateKey(deviceURL string, stateName string) string {
 }
 
 func (store *Store) handleOnlineChanged(online bool) {
-	store.onOnlineChanged.Execute(online)
+	store.online.Update(online)
 	// for now we consider devices stay even if offline (and states will stay accurate ...)
 }
 
@@ -251,16 +260,10 @@ func (store *Store) handleDeviceList(devices []kizcool.Device) {
 		deviceURL := string(device.DeviceURL)
 		list[deviceURL] = struct{}{}
 		existing := store.devices[deviceURL]
-		if existing == nil {
-			newDevice := &Device{
-				kiz: device,
-			}
 
-			store.devices[deviceURL] = newDevice
-			logger.Debugf("Device joined '%s", deviceURL)
-			store.onDeviceChanged.Execute(&DeviceChange{
-				device:    newDevice,
-				operation: OperationAdd,
+		if existing == nil {
+			store.addDevice(&Device{
+				kiz: device,
 			})
 		}
 
@@ -271,12 +274,7 @@ func (store *Store) handleDeviceList(devices []kizcool.Device) {
 	for _, device := range maps.Values(store.devices) {
 		deviceURL := device.DeviceURL()
 		if _, exists := list[deviceURL]; !exists {
-			delete(store.devices, deviceURL)
-			logger.Debugf("Device left '%s", deviceURL)
-			store.onDeviceChanged.Execute(&DeviceChange{
-				device:    device,
-				operation: OperationRemove,
-			})
+			store.removeDevice(device)
 		}
 	}
 }
@@ -288,28 +286,8 @@ func (store *Store) handleStateRefresh(arg *StateRefresh) {
 	store.refreshState(arg.DeviceURL(), arg.States())
 }
 
-func (store *Store) refreshState(deviceURL string, states []kizcool.DeviceState) {
-	for _, state := range states {
-		key := store.makeStateKey(deviceURL, string(state.Name))
-		oldState := store.states[key]
-
-		if oldState == nil || !reflect.DeepEqual(oldState.value, state.Value) {
-			newState := &DeviceState{
-				deviceURL: deviceURL,
-				name:      string(state.Name),
-				typ:       state.Type,
-				value:     state.Value,
-			}
-
-			store.states[key] = newState
-			store.onStateChanged.Execute(newState)
-		}
-	}
-
-}
-
 func (store *Store) handleExecRefresh(arg *ExecChange) {
-	store.onExecChanged.Execute(arg)
+	store.onExecChanged.Notify(arg)
 }
 
 func (store *Store) IsExecuting(deviceURL string) bool {
@@ -326,6 +304,61 @@ func (store *Store) IsExecuting(deviceURL string) bool {
 	}
 
 	return store.client.IsExecuting(&device.kiz)
+}
+
+func (store *Store) addDevice(device *Device) {
+	deviceURL := device.DeviceURL()
+
+	store.devices[deviceURL] = device
+
+	logger.Debugf("Device joined '%s", deviceURL)
+
+	store.onDeviceChanged.Notify(&DeviceChange{
+		device:    device,
+		operation: OperationAdd,
+	})
+}
+
+func (store *Store) removeDevice(device *Device) {
+	deviceURL := device.DeviceURL()
+
+	delete(store.devices, deviceURL)
+
+	logger.Debugf("Device left '%s", deviceURL)
+
+	store.onDeviceChanged.Notify(&DeviceChange{
+		device:    device,
+		operation: OperationRemove,
+	})
+}
+
+func (store *Store) clearDevices() {
+	for _, device := range maps.Values(store.devices) {
+		delete(store.devices, device.DeviceURL())
+		store.onDeviceChanged.Notify(&DeviceChange{
+			device:    device,
+			operation: OperationRemove,
+		})
+	}
+}
+
+func (store *Store) refreshState(deviceURL string, states []kizcool.DeviceState) {
+	for _, state := range states {
+		key := store.makeStateKey(deviceURL, string(state.Name))
+		oldState := store.states[key]
+
+		if oldState == nil || !reflect.DeepEqual(oldState.value, state.Value) {
+			newState := &DeviceState{
+				deviceURL: deviceURL,
+				name:      string(state.Name),
+				typ:       state.Type,
+				value:     state.Value,
+			}
+
+			store.states[key] = newState
+			store.onStateChanged.Notify(newState)
+		}
+	}
 }
 
 type storeContainer struct {
