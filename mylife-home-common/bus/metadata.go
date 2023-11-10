@@ -84,7 +84,6 @@ var _ RemoteMetadataView = (*remoteMetadataView)(nil)
 
 type remoteMetadataView struct {
 	client       *client
-	msgToken     tools.RegistrationToken
 	instanceName string
 	onChange     tools.Subject[*ValueChange]
 
