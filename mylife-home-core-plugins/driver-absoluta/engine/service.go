@@ -13,10 +13,10 @@ type Service struct {
 	connectedChanged func(bool)
 }
 
-func NewService(serverAddress string, pin string, state *State, connectedChanged func(bool)) *Service {
+func NewService(serverAddress string, uid string, pin string, state *State, connectedChanged func(bool)) *Service {
 
 	svc := &Service{
-		client:           itv2.MakeClient(serverAddress, pin),
+		client:           itv2.MakeClient(serverAddress, uid, pin),
 		state:            state,
 		connectedChanged: connectedChanged,
 	}

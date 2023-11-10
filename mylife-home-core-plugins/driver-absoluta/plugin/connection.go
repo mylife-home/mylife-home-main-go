@@ -13,6 +13,9 @@ type Connection struct {
 	// @Config(description="Adresse IP ou nom DNS de la centrale")
 	ServerAddress string
 
+	// @Config(description="Identifiant unique de la centrale")
+	Uid string
+
 	// @Config(description="Code pin de connexion")
 	Pin string
 
@@ -26,7 +29,7 @@ func (component *Connection) Init(runtime definitions.Runtime) error {
 	component.Connected.Set(false)
 
 	state := engine.GetState(component.Key)
-	component.service = engine.NewService(component.ServerAddress, component.Pin, state, component.connectedChanged)
+	component.service = engine.NewService(component.ServerAddress, component.Uid, component.Pin, state, component.connectedChanged)
 
 	return nil
 }

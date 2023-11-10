@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mylife-home-common/log"
 	"mylife-home-core-plugins-driver-absoluta/engine/itv2/commands"
+	"mylife-home-core-plugins-driver-absoluta/engine/itv2/http"
 	"mylife-home-core-plugins-driver-absoluta/engine/itv2/serialization"
 	"reflect"
 	"strings"
@@ -41,6 +42,7 @@ const heartbeatInterval = time.Second * 5
 
 type Client struct {
 	servAddr string
+	uid      string
 	pin      string
 
 	status                    ConnectionStatus
@@ -56,11 +58,12 @@ type Client struct {
 	transactions *transactionManager
 }
 
-func MakeClient(servAddr string, pin string) *Client {
+func MakeClient(servAddr string, uid string, pin string) *Client {
 	ctx, close := context.WithCancel(context.Background())
 
 	client := &Client{
 		servAddr:                  servAddr,
+		uid:                       uid,
 		pin:                       pin,
 		ctx:                       ctx,
 		close:                     close,
@@ -121,7 +124,9 @@ func (client *Client) worker() {
 	defer client.workerSync.Done()
 
 	for {
-		client.connection()
+		if http.CheckAvailability(client.ctx, client.uid) {
+			client.connection()
+		}
 
 		select {
 		case <-client.ctx.Done():
