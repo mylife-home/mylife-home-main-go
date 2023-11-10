@@ -30,10 +30,10 @@ type Client struct {
 	workedExited    chan struct{}
 	triggerRefresh  func()
 	executions      *runningExecutions
-	onOnlineChanged *tools.CallbackManager[bool]
-	onDeviceList    *tools.CallbackManager[[]kizcool.Device]
-	onStateRefresh  *tools.CallbackManager[*StateRefresh]
-	onExecRefresh   *tools.CallbackManager[*ExecChange]
+	onOnlineChanged tools.SubjectValue[bool]
+	onDeviceList    tools.Subject[[]kizcool.Device]
+	onStateRefresh  tools.Subject[*StateRefresh]
+	onExecRefresh   tools.Subject[*ExecChange]
 }
 
 const tahomaUrlBase = "https://ha101-1.overkiz.com/enduser-mobile-web"
@@ -50,17 +50,14 @@ func MakeClient(user string, pass string) (*Client, error) {
 	ctx, close := context.WithCancel(context.Background())
 
 	client := &Client{
-		kiz:           kiz,
-		connected:     false,
-		workerContext: ctx,
-		workerClose:   close,
-		workedExited:  make(chan struct{}),
-		// triggerRefresh
-		// executions
-		onOnlineChanged: tools.NewCallbackManager[bool](),
-		onDeviceList:    tools.NewCallbackManager[[]kizcool.Device](),
-		onStateRefresh:  tools.NewCallbackManager[*StateRefresh](),
-		onExecRefresh:   tools.NewCallbackManager[*ExecChange](),
+		kiz:             kiz,
+		workerContext:   ctx,
+		workerClose:     close,
+		workedExited:    make(chan struct{}),
+		onOnlineChanged: tools.MakeSubjectValue[bool](false),
+		onDeviceList:    tools.MakeSubject[[]kizcool.Device](),
+		onStateRefresh:  tools.MakeSubject[*StateRefresh](),
+		onExecRefresh:   tools.MakeSubject[*ExecChange](),
 	}
 
 	client.executions = newRunningExecutions(client.onExecChanged)
@@ -76,38 +73,30 @@ func (client *Client) Terminate() {
 	client.kiz = nil
 }
 
-func (client *Client) OnOnlineChanged() tools.CallbackRegistration[bool] {
+func (client *Client) OnOnlineChanged() tools.ObservableValue[bool] {
 	return client.onOnlineChanged
 }
 
-func (client *Client) Online() bool {
-	return client.connected
-}
-
-func (client *Client) OnDeviceList() tools.CallbackRegistration[[]kizcool.Device] {
+func (client *Client) OnDeviceList() tools.Observable[[]kizcool.Device] {
 	return client.onDeviceList
 }
 
-func (client *Client) OnStateRefresh() tools.CallbackRegistration[*StateRefresh] {
+func (client *Client) OnStateRefresh() tools.Observable[*StateRefresh] {
 	return client.onStateRefresh
 }
 
-func (client *Client) OnExecRefresh() tools.CallbackRegistration[*ExecChange] {
+func (client *Client) OnExecRefresh() tools.Observable[*ExecChange] {
 	return client.onExecRefresh
 }
 
 func (client *Client) setConnected(value bool) {
-	if client.connected == value {
-		return
+	if client.onOnlineChanged.Update(value) {
+		logger.Infof("Connected = %t", value)
 	}
-
-	client.connected = value
-	logger.Infof("Connected = %t", client.connected)
-	client.onOnlineChanged.Execute(client.connected)
 }
 
 func (client *Client) onExecChanged(deviceURL kizcool.DeviceURL, executing bool) {
-	client.onExecRefresh.Execute(&ExecChange{
+	client.onExecRefresh.Notify(&ExecChange{
 		deviceURL: string(deviceURL),
 		executing: executing,
 	})
@@ -257,7 +246,7 @@ func (client *Client) processEvent(event kizcool.Event) {
 		}
 
 	case *kizcool.DeviceStateChangedEvent:
-		client.onStateRefresh.Execute(&StateRefresh{
+		client.onStateRefresh.Notify(&StateRefresh{
 			deviceURL: string(event.DeviceURL),
 			states:    event.DeviceStates,
 		})
@@ -290,7 +279,7 @@ func (client *Client) devicesRefresh() {
 		return
 	}
 
-	client.onDeviceList.Execute(devices)
+	client.onDeviceList.Notify(devices)
 }
 
 type runningExecutions struct {

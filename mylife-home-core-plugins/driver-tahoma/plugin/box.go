@@ -20,14 +20,17 @@ type Box struct {
 	// @State()
 	Online definitions.State[bool]
 
-	store                   *engine.Store
-	client                  *engine.Client
-	storeOnlineChangedToken tools.RegistrationToken
+	store                  *engine.Store
+	client                 *engine.Client
+	storeOnlineChangedChan chan bool
 }
 
 func (component *Box) Init(runtime definitions.Runtime) error {
 	component.store = engine.GetStore(component.BoxKey)
-	component.storeOnlineChangedToken = component.store.OnOnlineChanged().Register(component.handleOnlineChanged)
+
+	component.storeOnlineChangedChan = make(chan bool)
+	tools.DispatchChannel(component.storeOnlineChangedChan, component.handleOnlineChanged)
+	component.store.OnOnlineChanged().Subscribe(component.storeOnlineChangedChan, true)
 
 	client, err := engine.MakeClient(component.User, component.Password)
 	if err != nil {
@@ -49,7 +52,9 @@ func (component *Box) Terminate() {
 		component.client = nil
 	}
 
-	component.store.OnOnlineChanged().Unregister(component.storeOnlineChangedToken)
+	component.store.OnOnlineChanged().Unsubscribe(component.storeOnlineChangedChan)
+	close(component.storeOnlineChangedChan)
+
 	engine.ReleaseStore(component.BoxKey)
 }
 

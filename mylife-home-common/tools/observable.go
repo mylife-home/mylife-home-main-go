@@ -24,7 +24,7 @@ type ObservableValue[T any] interface {
 type SubjectValue[T any] interface {
 	ObservableValue[T]
 
-	Update(newValue T)
+	Update(newValue T) bool
 }
 
 var _ Observable[int] = (*subject[int])(nil)
@@ -108,12 +108,12 @@ func (sub *subjectValue[T]) Get() T {
 // Channels must be unbuffered to have synchronized dispatch.
 //
 // Channels must be buffered to have non-blocking dispatch.
-func (sub *subjectValue[T]) Update(newValue T) {
+func (sub *subjectValue[T]) Update(newValue T) bool {
 	sub.valMux.Lock()
 	defer sub.valMux.Unlock()
 
 	if sub.value == newValue {
-		return
+		return false
 	}
 
 	sub.value = newValue
@@ -134,6 +134,7 @@ func (sub *subjectValue[T]) Update(newValue T) {
 
 	wg.Wait()
 
+	return true
 }
 
 func (sub *subjectValue[T]) Subscribe(observer chan<- T, sendCurrent bool) {
