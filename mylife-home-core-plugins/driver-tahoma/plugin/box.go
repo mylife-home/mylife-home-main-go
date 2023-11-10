@@ -30,7 +30,7 @@ func (component *Box) Init(runtime definitions.Runtime) error {
 
 	component.storeOnlineChangedChan = make(chan bool)
 	tools.DispatchChannel(component.storeOnlineChangedChan, component.handleOnlineChanged)
-	component.store.OnOnlineChanged().Subscribe(component.storeOnlineChangedChan, true)
+	component.store.Online().Subscribe(component.storeOnlineChangedChan, true)
 
 	client, err := engine.MakeClient(component.User, component.Password)
 	if err != nil {
@@ -52,7 +52,7 @@ func (component *Box) Terminate() {
 		component.client = nil
 	}
 
-	component.store.OnOnlineChanged().Unsubscribe(component.storeOnlineChangedChan)
+	component.store.Online().Unsubscribe(component.storeOnlineChangedChan)
 	close(component.storeOnlineChangedChan)
 
 	engine.ReleaseStore(component.BoxKey)

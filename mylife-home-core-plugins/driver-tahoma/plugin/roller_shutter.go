@@ -51,7 +51,7 @@ func (component *RollerShutter) Init(runtime definitions.Runtime) error {
 	tools.DispatchChannel(component.storeStateChangedChan, component.handleStateChanged)
 	tools.DispatchChannel(component.storeExecChangedChan, component.handleExecChanged)
 
-	component.store.OnOnlineChanged().Subscribe(component.storeOnlineChangedChan, true)
+	component.store.Online().Subscribe(component.storeOnlineChangedChan, true)
 	component.store.OnDeviceChanged().Subscribe(component.storeDeviceChangedChan)
 	component.store.OnStateChanged().Subscribe(component.storeStateChangedChan)
 	component.store.OnExecChanged().Subscribe(component.storeExecChangedChan)
@@ -61,7 +61,7 @@ func (component *RollerShutter) Init(runtime definitions.Runtime) error {
 
 func (component *RollerShutter) Terminate() {
 
-	component.store.OnOnlineChanged().Unsubscribe(component.storeOnlineChangedChan)
+	component.store.Online().Unsubscribe(component.storeOnlineChangedChan)
 	component.store.OnDeviceChanged().Unsubscribe(component.storeDeviceChangedChan)
 	component.store.OnStateChanged().Unsubscribe(component.storeStateChangedChan)
 	component.store.OnExecChanged().Unsubscribe(component.storeExecChangedChan)

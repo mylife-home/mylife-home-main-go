@@ -42,7 +42,7 @@ func (component *SlidingGate) Init(runtime definitions.Runtime) error {
 	tools.DispatchChannel(component.storeDeviceChangedChan, component.handleDeviceChanged)
 	tools.DispatchChannel(component.storeExecChangedChan, component.handleExecChanged)
 
-	component.store.OnOnlineChanged().Subscribe(component.storeOnlineChangedChan, true)
+	component.store.Online().Subscribe(component.storeOnlineChangedChan, true)
 	component.store.OnDeviceChanged().Subscribe(component.storeDeviceChangedChan)
 	component.store.OnExecChanged().Subscribe(component.storeExecChangedChan)
 
@@ -50,7 +50,7 @@ func (component *SlidingGate) Init(runtime definitions.Runtime) error {
 }
 
 func (component *SlidingGate) Terminate() {
-	component.store.OnOnlineChanged().Unsubscribe(component.storeOnlineChangedChan)
+	component.store.Online().Unsubscribe(component.storeOnlineChangedChan)
 	component.store.OnDeviceChanged().Unsubscribe(component.storeDeviceChangedChan)
 	component.store.OnExecChanged().Unsubscribe(component.storeExecChangedChan)
 

@@ -23,17 +23,16 @@ func (arg *StateRefresh) States() []kizcool.DeviceState {
 }
 
 type Client struct {
-	kiz             *kizcool.Kiz
-	connected       bool
-	workerContext   context.Context
-	workerClose     func()
-	workedExited    chan struct{}
-	triggerRefresh  func()
-	executions      *runningExecutions
-	onOnlineChanged tools.SubjectValue[bool]
-	onDeviceList    tools.Subject[[]kizcool.Device]
-	onStateRefresh  tools.Subject[*StateRefresh]
-	onExecRefresh   tools.Subject[*ExecChange]
+	kiz            *kizcool.Kiz
+	workerContext  context.Context
+	workerClose    func()
+	workedExited   chan struct{}
+	triggerRefresh func()
+	executions     *runningExecutions
+	online         tools.SubjectValue[bool]
+	onDeviceList   tools.Subject[[]kizcool.Device]
+	onStateRefresh tools.Subject[*StateRefresh]
+	onExecRefresh  tools.Subject[*ExecChange]
 }
 
 const tahomaUrlBase = "https://ha101-1.overkiz.com/enduser-mobile-web"
@@ -50,14 +49,14 @@ func MakeClient(user string, pass string) (*Client, error) {
 	ctx, close := context.WithCancel(context.Background())
 
 	client := &Client{
-		kiz:             kiz,
-		workerContext:   ctx,
-		workerClose:     close,
-		workedExited:    make(chan struct{}),
-		onOnlineChanged: tools.MakeSubjectValue[bool](false),
-		onDeviceList:    tools.MakeSubject[[]kizcool.Device](),
-		onStateRefresh:  tools.MakeSubject[*StateRefresh](),
-		onExecRefresh:   tools.MakeSubject[*ExecChange](),
+		kiz:            kiz,
+		workerContext:  ctx,
+		workerClose:    close,
+		workedExited:   make(chan struct{}),
+		online:         tools.MakeSubjectValue[bool](false),
+		onDeviceList:   tools.MakeSubject[[]kizcool.Device](),
+		onStateRefresh: tools.MakeSubject[*StateRefresh](),
+		onExecRefresh:  tools.MakeSubject[*ExecChange](),
 	}
 
 	client.executions = newRunningExecutions(client.onExecChanged)
@@ -73,8 +72,8 @@ func (client *Client) Terminate() {
 	client.kiz = nil
 }
 
-func (client *Client) OnOnlineChanged() tools.ObservableValue[bool] {
-	return client.onOnlineChanged
+func (client *Client) Online() tools.ObservableValue[bool] {
+	return client.online
 }
 
 func (client *Client) OnDeviceList() tools.Observable[[]kizcool.Device] {
@@ -90,7 +89,7 @@ func (client *Client) OnExecRefresh() tools.Observable[*ExecChange] {
 }
 
 func (client *Client) setConnected(value bool) {
-	if client.onOnlineChanged.Update(value) {
+	if client.online.Update(value) {
 		logger.Infof("Connected = %t", value)
 	}
 }
@@ -103,7 +102,7 @@ func (client *Client) onExecChanged(deviceURL kizcool.DeviceURL, executing bool)
 }
 
 func (client *Client) Execute(device *kizcool.Device, command string, args ...any) {
-	if !client.connected {
+	if !client.online.Get() {
 		logger.Warnf("Client is offline, cannot run command '%s' on device '%s'.", command, device.DeviceURL)
 		return
 	}
@@ -134,7 +133,7 @@ func (client *Client) Execute(device *kizcool.Device, command string, args ...an
 }
 
 func (client *Client) Interrupt(device *kizcool.Device) {
-	if !client.connected {
+	if !client.online.Get() {
 		logger.Warnf("Client is offline, cannot interrupt on device '%s'.", device.DeviceURL)
 		return
 	}

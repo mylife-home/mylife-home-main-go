@@ -96,7 +96,7 @@ type Store struct {
 
 	devices         map[string]*Device
 	states          map[string]*DeviceState // key = <deviceURL>$<name>
-	onOnlineChanged tools.SubjectValue[bool]
+	online          tools.SubjectValue[bool]
 	onDeviceChanged tools.Subject[*DeviceChange]
 	onStateChanged  tools.Subject[*DeviceState]
 	onExecChanged   tools.Subject[*ExecChange]
@@ -108,7 +108,7 @@ func newStore() *Store {
 	return &Store{
 		devices:         make(map[string]*Device),
 		states:          make(map[string]*DeviceState),
-		onOnlineChanged: tools.MakeSubjectValue[bool](false),
+		online:          tools.MakeSubjectValue[bool](false),
 		onDeviceChanged: tools.MakeSubject[*DeviceChange](),
 		onStateChanged:  tools.MakeSubject[*DeviceState](),
 		onExecChanged:   tools.MakeSubject[*ExecChange](),
@@ -133,7 +133,7 @@ func (store *Store) SetClient(client *Client) {
 	tools.DispatchChannel(store.clientStateRefreshChan, store.handleStateRefresh)
 	tools.DispatchChannel(store.clientExecRefreshChan, store.handleExecRefresh)
 
-	store.client.OnOnlineChanged().Subscribe(store.clientOnlineChangedChan, true)
+	store.client.Online().Subscribe(store.clientOnlineChangedChan, true)
 	store.client.OnDeviceList().Subscribe(store.clientDeviceListChan)
 	store.client.OnStateRefresh().Subscribe(store.clientStateRefreshChan)
 	store.client.OnExecRefresh().Subscribe(store.clientExecRefreshChan)
@@ -145,7 +145,7 @@ func (store *Store) clearClient() {
 
 	panics.IsTrue(store.client != nil)
 
-	store.client.OnOnlineChanged().Unsubscribe(store.clientOnlineChangedChan)
+	store.client.Online().Unsubscribe(store.clientOnlineChangedChan)
 	store.client.OnDeviceList().Unsubscribe(store.clientDeviceListChan)
 	store.client.OnStateRefresh().Unsubscribe(store.clientStateRefreshChan)
 	store.client.OnExecRefresh().Unsubscribe(store.clientExecRefreshChan)
@@ -160,7 +160,7 @@ func (store *Store) clearClient() {
 	store.clientStateRefreshChan = nil
 	store.clientExecRefreshChan = nil
 
-	store.onOnlineChanged.Update(false)
+	store.online.Update(false)
 
 	store.client = nil
 }
@@ -209,8 +209,8 @@ func (store *Store) Interrupt(deviceURL string) {
 	store.client.Interrupt(&device.kiz)
 }
 
-func (store *Store) OnOnlineChanged() tools.ObservableValue[bool] {
-	return store.onOnlineChanged
+func (store *Store) Online() tools.ObservableValue[bool] {
+	return store.online
 }
 
 func (store *Store) OnDeviceChanged() tools.Observable[*DeviceChange] {
@@ -245,7 +245,7 @@ func (store *Store) makeStateKey(deviceURL string, stateName string) string {
 }
 
 func (store *Store) handleOnlineChanged(online bool) {
-	store.onOnlineChanged.Update(online)
+	store.online.Update(online)
 	// for now we consider devices stay even if offline (and states will stay accurate ...)
 }
 
