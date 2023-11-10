@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"maps"
+	"mylife-home-common/tools"
 	"mylife-home-core-plugins-driver-absoluta/engine/itv2/commands"
 	"sync"
 
@@ -8,95 +10,70 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type StateCallbackHandle int
-
-type State struct {
-	partitions []*PartitionState
-	zones      []*ZoneState
-	mux        sync.RWMutex
-
-	partitionLabels map[string]*PartitionState
-	zoneLabels      map[string]*ZoneState
-
-	cbmux     sync.Mutex
-	cbcounter StateCallbackHandle
-	callbacks map[StateCallbackHandle]func()
+type StateValue interface {
+	GetPartitionStatus(label string, statusPart string) bool
+	GetZoneStatus(label string, statusPart string) bool
 }
 
-type PartitionState struct {
+type State = tools.ObservableValue[StateValue]
+
+type partitionState struct {
 	label  string
 	status commands.PartitionStatusWord
 }
 
-type ZoneState struct {
+type zoneState struct {
 	label  string
 	status commands.ZoneStatusWord
 }
 
-func makeState() *State {
-	return &State{
-		partitionLabels: make(map[string]*PartitionState),
-		zoneLabels:      make(map[string]*ZoneState),
-		cbcounter:       0,
-		callbacks:       make(map[StateCallbackHandle]func()),
-	}
+type stateValue struct {
+	partitions []*partitionState
+	zones      []*zoneState
+
+	partitionLabels map[string]*partitionState
+	zoneLabels      map[string]*zoneState
 }
 
-func (state *State) ObserveChange(callback func()) StateCallbackHandle {
-	state.cbmux.Lock()
-	defer state.cbmux.Unlock()
-
-	state.cbcounter += 1
-	handle := state.cbcounter
-
-	state.callbacks[handle] = callback
-	return handle
+var initialStateValue StateValue = &stateValue{
+	partitionLabels: make(map[string]*partitionState),
+	zoneLabels:      make(map[string]*zoneState),
 }
 
-func (state *State) UnobserveChange(handle StateCallbackHandle) {
-	state.cbmux.Lock()
-	defer state.cbmux.Unlock()
-
-	delete(state.callbacks, handle)
-}
-
-func (state *State) notify() {
-	state.cbmux.Lock()
-	defer state.cbmux.Unlock()
-
-	for _, callback := range state.callbacks {
-		go callback()
-	}
-}
-
-func (state *State) updateCapabilities(partitionCount int, zoneCount int) {
+func (state *stateValue) updateCapabilities(partitionCount int, zoneCount int) *stateValue {
 	// Note: should never change after first set
-	state.mux.Lock()
-	defer state.mux.Unlock()
-
 	change := false
+	spartitions := state.partitions
+	szones := state.zones
+	spartitionLabels := state.partitionLabels
+	szoneLabels := state.zoneLabels
 
-	if len(state.partitions) != partitionCount {
-		state.partitions = make([]*PartitionState, partitionCount)
-		state.partitionLabels = make(map[string]*PartitionState)
+	if len(spartitions) != partitionCount {
+		spartitions = make([]*partitionState, partitionCount)
+		spartitionLabels = make(map[string]*partitionState)
 		change = true
 	}
 
-	if len(state.zones) != zoneCount {
-		state.zones = make([]*ZoneState, zoneCount)
-		state.zoneLabels = make(map[string]*ZoneState)
+	if len(szones) != zoneCount {
+		szones = make([]*zoneState, zoneCount)
+		szoneLabels = make(map[string]*zoneState)
 		change = true
 	}
 
-	if change {
-		state.notify()
+	if !change {
+		return state
+	}
+
+	return &stateValue{
+		partitions:      spartitions,
+		zones:           szones,
+		partitionLabels: spartitionLabels,
+		zoneLabels:      szoneLabels,
 	}
 }
 
-func (state *State) updateAssignedPartitions(partitions []int) {
+func (state *stateValue) updateAssignedPartitions(partitions []int) *stateValue {
 	// Note: change should be rare
-	state.mux.Lock()
-	defer state.mux.Unlock()
 
 	partitionSet := make(map[int]struct{})
 	for _, index := range partitions {
@@ -105,37 +82,48 @@ func (state *State) updateAssignedPartitions(partitions []int) {
 	}
 
 	change := false
+	spartitions := state.partitions
+	spartitionLabels := state.partitionLabels
 
-	for index := range state.partitions {
+	for index := range spartitions {
 		_, assigned := partitionSet[index]
-		actualAssigned := state.partitions[index] != nil
+		actualAssigned := spartitions[index] != nil
 		if actualAssigned == assigned {
 			continue
 		}
 
+		spartitions = slices.Clone(spartitions)
+
 		if assigned {
-			state.partitions[index] = &PartitionState{}
+			spartitions[index] = &partitionState{}
 		} else {
-			oldLabel := state.partitions[index].label
+			oldLabel := spartitions[index].label
 			if oldLabel != "" {
-				delete(state.partitionLabels, oldLabel)
+				spartitionLabels = maps.Clone(spartitionLabels)
+				delete(spartitionLabels, oldLabel)
 			}
 
-			state.partitions[index] = nil
+			spartitions[index] = nil
 		}
 
 		change = true
 	}
 
-	if change {
-		state.notify()
+	if !change {
+		return state
+	}
+
+	return &stateValue{
+		partitions:      spartitions,
+		zones:           state.zones,
+		partitionLabels: spartitionLabels,
+		zoneLabels:      state.zoneLabels,
 	}
 }
 
-func (state *State) updateAssignedZones(zones []int) {
+func (state *stateValue) updateAssignedZones(zones []int) *stateValue {
 	// Note: change should be rare
-	state.mux.Lock()
-	defer state.mux.Unlock()
+
 	zoneSet := make(map[int]struct{})
 	for _, index := range zones {
 		// indexes starts at 1
@@ -143,143 +131,190 @@ func (state *State) updateAssignedZones(zones []int) {
 	}
 
 	change := false
+	szones := state.zones
+	szoneLabels := state.zoneLabels
 
-	for index := range state.zones {
+	for index := range szones {
 		_, assigned := zoneSet[index]
-		actualAssigned := state.zones[index] != nil
+		actualAssigned := szones[index] != nil
 		if actualAssigned == assigned {
 			continue
 		}
 
+		szones = slices.Clone(szones)
+
 		if assigned {
-			state.zones[index] = &ZoneState{}
+			szones[index] = &zoneState{}
 		} else {
-			oldLabel := state.zones[index].label
+			oldLabel := szones[index].label
 			if oldLabel != "" {
-				delete(state.zoneLabels, oldLabel)
+				szoneLabels = maps.Clone(szoneLabels)
+				delete(szoneLabels, oldLabel)
 			}
 
-			state.zones[index] = nil
+			szones[index] = nil
 		}
 
 		change = true
 	}
 
-	if change {
-		state.notify()
+	if !change {
+		return state
+	}
+
+	return &stateValue{
+		partitions:      state.partitions,
+		zones:           szones,
+		partitionLabels: state.partitionLabels,
+		zoneLabels:      szoneLabels,
 	}
 }
 
-func (state *State) updatePartitionLabel(index int, label string) {
+func (state *stateValue) updatePartitionLabel(index int, label string) *stateValue {
 	// Note: change should be rare
-	state.mux.Lock()
-	defer state.mux.Unlock()
-
-	change := false
 
 	// indexes starts at 1
 	partition := state.partitions[index-1]
 	if partition == nil {
 		logger.Warnf("Got label for unassigned partition %d", index)
-		return
+		return state
 	}
 
-	if partition.label != label {
-		oldLabel := partition.label
-		if oldLabel != "" {
-			delete(state.partitionLabels, oldLabel)
-		}
-
-		partition.label = label
-		state.partitionLabels[label] = partition
-		logger.Debugf("Partition %d has label %s", index-1, label)
-
-		change = true
+	if partition.label == label {
+		return state
 	}
 
-	if change {
-		state.notify()
+	spartitions := slices.Clone(state.partitions)
+	spartitionLabels := maps.Clone(state.partitionLabels)
+	*partition = *partition
+	spartitions[index-1] = partition
+
+	oldLabel := partition.label
+	if oldLabel != "" {
+		delete(spartitionLabels, oldLabel)
+	}
+
+	partition.label = label
+	spartitionLabels[label] = partition
+	logger.Debugf("Partition %d has label %s", index-1, label)
+
+	return &stateValue{
+		partitions:      spartitions,
+		zones:           state.zones,
+		partitionLabels: spartitionLabels,
+		zoneLabels:      state.zoneLabels,
 	}
 }
 
-func (state *State) updateZoneLabel(index int, label string) {
+func (state *stateValue) updateZoneLabel(index int, label string) *stateValue {
 	// Note: change should be rare
-	state.mux.Lock()
-	defer state.mux.Unlock()
-
-	change := false
 
 	// indexes starts at 1
 	zone := state.zones[index-1]
 	if zone == nil {
 		logger.Warnf("Got label for unassigned zone %d", index)
-		return
+		return state
 	}
 
-	if zone.label != label {
-		oldLabel := zone.label
-		if oldLabel != "" {
-			delete(state.zoneLabels, oldLabel)
-		}
-
-		zone.label = label
-		state.zoneLabels[label] = zone
-		logger.Debugf("Zone %d has label %s", index-1, label)
-
-		change = true
+	if zone.label == label {
+		return state
 	}
 
-	if change {
-		state.notify()
+	szones := slices.Clone(state.zones)
+	szoneLabels := maps.Clone(state.zoneLabels)
+	*zone = *zone
+	szones[index-1] = zone
+
+	oldLabel := zone.label
+	if oldLabel != "" {
+		delete(szoneLabels, oldLabel)
+	}
+
+	zone.label = label
+	szoneLabels[label] = zone
+	logger.Debugf("Zone %d has label %s", index-1, label)
+
+	return &stateValue{
+		partitions:      state.partitions,
+		zones:           szones,
+		partitionLabels: state.partitionLabels,
+		zoneLabels:      szoneLabels,
 	}
 }
 
-func (state *State) updatePartitionStatuses(statuses []commands.PartitionStatusWord) {
+func (state *stateValue) updatePartitionStatuses(statuses []commands.PartitionStatusWord) *stateValue {
 	// Note: change often
-	state.mux.Lock()
-	defer state.mux.Unlock()
 
-	change := false
+	var spartitions []*partitionState
 
 	for index, status := range statuses {
 		partition := state.partitions[index]
-		if partition != nil && !slices.Equal(partition.status, status) {
-			partition.status = status
-			change = true
+		if partition == nil || slices.Equal(partition.status, status) {
+			continue
 		}
+
+		// clone slice on first change only
+		if spartitions == nil {
+			spartitions = slices.Clone(state.partitions)
+		}
+
+		*partition = *partition
+		spartitions[index] = partition
+
+		partition.status = status
 	}
 
-	if change {
-		logger.Debugf("Got partition statuses %+v", statuses)
-		state.notify()
+	if spartitions == nil {
+		return state
+	}
+
+	logger.Debugf("Got partition statuses %+v", statuses)
+
+	return &stateValue{
+		partitions:      spartitions,
+		zones:           state.zones,
+		partitionLabels: state.partitionLabels,
+		zoneLabels:      state.zoneLabels,
 	}
 }
 
-func (state *State) updateZoneStatuses(statuses []commands.ZoneStatusWord) {
+func (state *stateValue) updateZoneStatuses(statuses []commands.ZoneStatusWord) *stateValue {
 	// Note: change often
-	state.mux.Lock()
-	defer state.mux.Unlock()
 
-	change := false
+	var szones []*zoneState
 
 	for index, status := range statuses {
 		zone := state.zones[index]
-		if zone != nil && !slices.Equal(zone.status, status) {
-			zone.status = status
-			change = true
+		if zone == nil || slices.Equal(zone.status, status) {
+			continue
 		}
+
+		// clone slice on first change only
+		if szones == nil {
+			szones = slices.Clone(state.zones)
+		}
+
+		*zone = *zone
+		szones[index] = zone
+
+		zone.status = status
 	}
 
-	if change {
-		logger.Debugf("Got zone statuses %+v", statuses)
-		state.notify()
+	if szones == nil {
+		return state
+	}
+
+	logger.Debugf("Got zone statuses %+v", statuses)
+
+	return &stateValue{
+		partitions:      state.partitions,
+		zones:           szones,
+		partitionLabels: state.partitionLabels,
+		zoneLabels:      state.zoneLabels,
 	}
 }
 
-func (state *State) GetPartitionStatus(label string, statusPart string) bool {
-	state.mux.RLock()
-	defer state.mux.RUnlock()
-
+func (state *stateValue) GetPartitionStatus(label string, statusPart string) bool {
 	partition, ok := state.partitionLabels[label]
 	if !ok {
 		return false
@@ -316,10 +351,7 @@ func (state *State) GetPartitionStatus(label string, statusPart string) bool {
 	return false
 }
 
-func (state *State) GetZoneStatus(label string, statusPart string) bool {
-	state.mux.RLock()
-	defer state.mux.RUnlock()
-
+func (state *stateValue) GetZoneStatus(label string, statusPart string) bool {
 	zone, ok := state.zoneLabels[label]
 	if !ok {
 		return false
@@ -352,4 +384,73 @@ func (state *State) GetZoneStatus(label string, statusPart string) bool {
 	log.Warnf("Unknown zone status '%s'", statusPart)
 
 	return false
+}
+
+type stateUpdater struct {
+	state tools.SubjectValue[StateValue]
+	mux   sync.Mutex
+}
+
+// Note: avoid creating 2 updaters for 1 state, it would cause mux mismatches
+func makeStateUpdater(state State) *stateUpdater {
+	return &stateUpdater{
+		state: state.(tools.SubjectValue[StateValue]),
+	}
+}
+
+func (updater *stateUpdater) update(callback func(*stateValue) *stateValue) {
+	updater.mux.Lock()
+	defer updater.mux.Unlock()
+
+	value := updater.state.Get().(*stateValue)
+
+	newValue := callback(value)
+	if newValue == value {
+		return
+	}
+
+	updater.state.Update(newValue)
+
+}
+
+func (updater *stateUpdater) UpdateCapabilities(partitionCount int, zoneCount int) {
+	updater.update(func(value *stateValue) *stateValue {
+		return value.updateCapabilities(partitionCount, zoneCount)
+	})
+}
+
+func (updater *stateUpdater) UpdateAssignedPartitions(partitions []int) {
+	updater.update(func(value *stateValue) *stateValue {
+		return value.updateAssignedPartitions(partitions)
+	})
+}
+
+func (updater *stateUpdater) UpdateAssignedZones(zones []int) {
+	updater.update(func(value *stateValue) *stateValue {
+		return value.updateAssignedZones(zones)
+	})
+}
+
+func (updater *stateUpdater) UpdatePartitionLabel(index int, label string) {
+	updater.update(func(value *stateValue) *stateValue {
+		return value.updatePartitionLabel(index, label)
+	})
+}
+
+func (updater *stateUpdater) UpdateZoneLabel(index int, label string) {
+	updater.update(func(value *stateValue) *stateValue {
+		return value.updateZoneLabel(index, label)
+	})
+}
+
+func (updater *stateUpdater) UpdatePartitionStatuses(statuses []commands.PartitionStatusWord) {
+	updater.update(func(value *stateValue) *stateValue {
+		return value.updatePartitionStatuses(statuses)
+	})
+}
+
+func (updater *stateUpdater) UpdateZoneStatuses(statuses []commands.ZoneStatusWord) {
+	updater.update(func(value *stateValue) *stateValue {
+		return value.updateZoneStatuses(statuses)
+	})
 }

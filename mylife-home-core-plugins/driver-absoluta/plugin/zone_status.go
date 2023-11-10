@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"mylife-home-common/tools"
 	"mylife-home-core-library/definitions"
 	"mylife-home-core-plugins-driver-absoluta/engine"
 )
@@ -19,24 +20,28 @@ type ZoneStatus struct {
 	// @State(description="current value")
 	Value definitions.State[bool]
 
-	state    *engine.State
-	cbhandle engine.StateCallbackHandle
+	state           engine.State
+	stateUpdateChan chan engine.StateValue
 }
 
 func (component *ZoneStatus) Init(runtime definitions.Runtime) error {
 	component.Value.Set(false)
 
 	component.state = engine.GetState(component.Key)
-	component.cbhandle = component.state.ObserveChange(component.stateChanged)
+
+	component.stateUpdateChan = make(chan engine.StateValue)
+	tools.DispatchChannel(component.stateUpdateChan, component.stateChanged)
+	component.state.Subscribe(component.stateUpdateChan, true)
 
 	return nil
 }
 
 func (component *ZoneStatus) Terminate() {
-	component.state.UnobserveChange(component.cbhandle)
+	component.state.Unsubscribe(component.stateUpdateChan)
+	close(component.stateUpdateChan)
 }
 
-func (component *ZoneStatus) stateChanged() {
-	value := component.state.GetZoneStatus(component.Label, component.Status)
+func (component *ZoneStatus) stateChanged(state engine.StateValue) {
+	value := state.GetZoneStatus(component.Label, component.Status)
 	component.Value.Set(value)
 }

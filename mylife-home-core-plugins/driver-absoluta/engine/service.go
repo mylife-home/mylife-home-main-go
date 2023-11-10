@@ -9,15 +9,15 @@ import (
 
 type Service struct {
 	client           *itv2.Client
-	state            *State
+	state            *stateUpdater
 	connectedChanged func(bool)
 }
 
-func NewService(serverAddress string, uid string, pin string, state *State, connectedChanged func(bool)) *Service {
+func NewService(serverAddress string, uid string, pin string, state State, connectedChanged func(bool)) *Service {
 
 	svc := &Service{
 		client:           itv2.MakeClient(serverAddress, uid, pin),
-		state:            state,
+		state:            makeStateUpdater(state),
 		connectedChanged: connectedChanged,
 	}
 
@@ -53,30 +53,42 @@ func (svc *Service) connectionLoop() {
 	state := svc.state
 
 	for {
+		logger.Debug(" Begin sleep")
 		time.Sleep(time.Second * 3)
+		logger.Debug(" End sleep")
 
 		if client.Status() != itv2.ConnectionOpen {
 			return
 		}
 
+		logger.Debug(" Begin GetPartitionStatus")
 		if statuses, err := client.GetPartitionStatus(); err != nil {
+			logger.WithError(err).Debug(" End GetPartitionStatus")
 			if client.Status() != itv2.ConnectionOpen {
 				return
 			}
 
 			logger.WithError(err).Error("Error reading partition statuses")
 		} else {
-			state.updatePartitionStatuses(statuses.GetData())
+			logger.Debug(" End GetPartitionStatus")
+			logger.Debug(" Begin updatePartitionStatuses")
+			state.UpdatePartitionStatuses(statuses.GetData())
+			logger.Debug(" End updatePartitionStatuses")
 		}
 
+		logger.Debug(" Begin GetZoneStatuses")
 		if statuses, err := client.GetZoneStatuses(); err != nil {
+			logger.WithError(err).Debug(" End GetZoneStatuses")
 			if client.Status() != itv2.ConnectionOpen {
 				return
 			}
 
 			logger.WithError(err).Error("Error reading zone statuses")
 		} else {
-			state.updateZoneStatuses(statuses.GetData())
+			logger.Debug(" End GetZoneStatuses")
+			logger.Debug(" Begin updateZoneStatuses")
+			state.UpdateZoneStatuses(statuses.GetData())
+			logger.Debug(" End updateZoneStatuses")
 		}
 	}
 }
@@ -90,12 +102,12 @@ func (svc *Service) handleNotification(cmd commands.Command) {
 		partitionCount := int(cmd.MaxPartitions.GetUint())
 		zoneCount := int(cmd.MaxZones.GetUint())
 		logger.Debugf("Got SystemCapabilities: partitions count=%d, zones count=%d", partitionCount, zoneCount)
-		state.updateCapabilities(partitionCount, zoneCount)
+		state.UpdateCapabilities(partitionCount, zoneCount)
 
 	case *commands.PartitionAssignmentConfiguration:
 		assignedPartitions := cmd.GetAssignedPartitions()
 		logger.Debugf("Got PartitionAssignmentConfiguration: %+v", assignedPartitions)
-		state.updateAssignedPartitions(assignedPartitions)
+		state.UpdateAssignedPartitions(assignedPartitions)
 
 		for _, index := range assignedPartitions {
 			go func(index int) {
@@ -105,7 +117,7 @@ func (svc *Service) handleNotification(cmd commands.Command) {
 					return
 				}
 
-				state.updatePartitionLabel(index, label)
+				state.UpdatePartitionLabel(index, label)
 			}(index)
 		}
 
@@ -113,7 +125,7 @@ func (svc *Service) handleNotification(cmd commands.Command) {
 		assignedZones := cmd.GetAssignedZones()
 		// Note: cmd.Req.PartitionNumber.GetUint() seems unused (always 0)
 		logger.Debugf("Got ZoneAssignmentConfiguration: %+v", assignedZones)
-		state.updateAssignedZones(assignedZones)
+		state.UpdateAssignedZones(assignedZones)
 
 		for _, index := range assignedZones {
 			go func(index int) {
@@ -123,7 +135,7 @@ func (svc *Service) handleNotification(cmd commands.Command) {
 					return
 				}
 
-				state.updateZoneLabel(index, label)
+				state.UpdateZoneLabel(index, label)
 			}(index)
 		}
 
