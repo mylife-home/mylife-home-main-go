@@ -26,7 +26,6 @@ go generate mylife-home-core-plugins/logic-colors/main.go
 go generate mylife-home-core-plugins/logic-selectors/main.go
 go generate mylife-home-core-plugins/logic-timers/main.go
 go generate mylife-home-core-plugins/ui-base/main.go
-
 ```
 
 ## Run
@@ -40,7 +39,7 @@ go run mylife-home-core/main.go --log-console
 ```shell
 # TODO: update version
 bash
-export DOCKER_IMAGE_TAG="vincenttr/mylife-home-core:go-1.0.2"
+export DOCKER_IMAGE_TAG="vincenttr/mylife-home-core:go-1.0.3"
 docker build --pull -t "$DOCKER_IMAGE_TAG" .
 docker push "$DOCKER_IMAGE_TAG"
 exit
