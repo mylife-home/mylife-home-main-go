@@ -53,15 +53,12 @@ func (svc *Service) connectionLoop() {
 	state := svc.state
 
 	for {
-		logger.Debug(" Begin sleep")
 		time.Sleep(time.Second * 3)
-		logger.Debug(" End sleep")
 
 		if client.Status() != itv2.ConnectionOpen {
 			return
 		}
 
-		logger.Debug(" Begin GetPartitionStatus")
 		if statuses, err := client.GetPartitionStatus(); err != nil {
 			logger.WithError(err).Debug(" End GetPartitionStatus")
 			if client.Status() != itv2.ConnectionOpen {
@@ -70,13 +67,9 @@ func (svc *Service) connectionLoop() {
 
 			logger.WithError(err).Error("Error reading partition statuses")
 		} else {
-			logger.Debug(" End GetPartitionStatus")
-			logger.Debug(" Begin updatePartitionStatuses")
 			state.UpdatePartitionStatuses(statuses.GetData())
-			logger.Debug(" End updatePartitionStatuses")
 		}
 
-		logger.Debug(" Begin GetZoneStatuses")
 		if statuses, err := client.GetZoneStatuses(); err != nil {
 			logger.WithError(err).Debug(" End GetZoneStatuses")
 			if client.Status() != itv2.ConnectionOpen {
@@ -85,10 +78,7 @@ func (svc *Service) connectionLoop() {
 
 			logger.WithError(err).Error("Error reading zone statuses")
 		} else {
-			logger.Debug(" End GetZoneStatuses")
-			logger.Debug(" Begin updateZoneStatuses")
 			state.UpdateZoneStatuses(statuses.GetData())
-			logger.Debug(" End updateZoneStatuses")
 		}
 	}
 }
