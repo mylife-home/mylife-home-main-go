@@ -4,6 +4,7 @@ import (
 	"mylife-home-common/bus"
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/tools"
+	"sync"
 
 	"golang.org/x/exp/maps"
 )
@@ -24,6 +25,7 @@ type busPublisher struct {
 	pluginChangeChan       chan *PluginChange
 	componentChangeChan    chan *ComponentChange
 	onlineChan             chan bool
+	api                    *busPublisherApi
 }
 
 // Publish registry local components/plugins to the bus
@@ -36,6 +38,10 @@ func PublishBus(transport *bus.Transport, registry Registry) BusPublisher {
 		pluginChangeChan:       make(chan *PluginChange),
 		componentChangeChan:    make(chan *ComponentChange),
 		onlineChan:             make(chan bool),
+		api: &busPublisherApi{
+			transport: transport,
+			groups:    make([]*busPublisherApiGroup, 0),
+		},
 	}
 
 	go publisher.worker()
@@ -138,7 +144,7 @@ func (publisher *busPublisher) onComponentChange(change *ComponentChange) {
 }
 
 func (publisher *busPublisher) publishPlugin(plugin *metadata.Plugin) {
-	bp := newBusPublisherPlugin(plugin, &busPublisherApi{publisher.transport})
+	bp := newBusPublisherPlugin(plugin, publisher.api)
 	publisher.busPublisherPlugins[plugin] = bp
 }
 
@@ -149,7 +155,7 @@ func (publisher *busPublisher) unpublishPlugin(plugin *metadata.Plugin) {
 }
 
 func (publisher *busPublisher) publishComponent(component Component) {
-	bc := newBusPublisherComponent(component, &busPublisherApi{publisher.transport})
+	bc := newBusPublisherComponent(component, publisher.api)
 	publisher.busPublisherComponents[component] = bc
 }
 
@@ -166,20 +172,33 @@ func (publisher *busPublisher) onOnlineChange(online bool) {
 	// process plugins first, then components
 	//  - on online : when a component is published, its plugin must already exist
 	//  - on offline : we are offline so we don't care, let's do it in the same order
+	publisher.api.BeginPublishGroup()
 	for _, bp := range plugins {
 		bp.onOnlineChange(online)
 	}
+	publisher.api.EndPublishGroup()
 
+	publisher.api.BeginPublishGroup()
 	for _, bc := range components {
 		bc.onOnlineChange(online)
 	}
+	publisher.api.EndPublishGroup()
 }
 
 type busPublisherApi struct {
-	transport *bus.Transport
+	transport     *bus.Transport
+	group         *busPublisherApiGroup // not locked
+	groups        []*busPublisherApiGroup
+	groupsMux     sync.Mutex
+	groupsRunning bool
 }
 
 func (api *busPublisherApi) PublishMeta(path string, value any) {
+	if api.group != nil {
+		api.group.Add(path, value)
+		return
+	}
+
 	go func() {
 		if err := api.transport.Metadata().Set(path, value); err != nil {
 			logger.WithError(err).Errorf("Could not publish metadata '%s'", path)
@@ -207,6 +226,87 @@ func (api *busPublisherApi) RemoveLocalComponent(comp bus.LocalComponent) {
 	go func() {
 		api.transport.Components().RemoveLocalComponent(comp)
 	}()
+}
+
+func (api *busPublisherApi) BeginPublishGroup() {
+	api.group = &busPublisherApiGroup{
+		transport:  api.transport,
+		operations: make([]publishData, 0),
+	}
+}
+
+func (api *busPublisherApi) EndPublishGroup() {
+	api.groupsMux.Lock()
+	defer api.groupsMux.Unlock()
+
+	api.groups = append(api.groups, api.group)
+	api.group = nil
+
+	if !api.groupsRunning {
+		api.groupsRunning = true
+		go api.runGroups()
+	}
+}
+
+func (api *busPublisherApi) runGroups() {
+	for {
+		group := api.runFetchNext()
+		if group == nil {
+			return
+		}
+
+		group.Run()
+	}
+}
+
+func (api *busPublisherApi) runFetchNext() *busPublisherApiGroup {
+	api.groupsMux.Lock()
+	defer api.groupsMux.Unlock()
+
+	if len(api.groups) > 0 {
+		group := api.groups[0]
+		api.groups = api.groups[1:]
+		return group
+	}
+
+	// no more
+	api.groupsRunning = false
+	return nil
+}
+
+type publishData struct {
+	path  string
+	value any
+}
+
+type busPublisherApiGroup struct {
+	transport  *bus.Transport
+	operations []publishData
+}
+
+func (group *busPublisherApiGroup) Add(path string, value any) {
+	group.operations = append(group.operations, publishData{path, value})
+}
+
+func (group *busPublisherApiGroup) Run() {
+	var wg sync.WaitGroup
+
+	wg.Add(len(group.operations))
+
+	for _, data := range group.operations {
+		path := data.path
+		value := data.value
+
+		go func() {
+			defer wg.Done()
+
+			if err := group.transport.Metadata().Set(path, value); err != nil {
+				logger.WithError(err).Errorf("Could not publish metadata '%s'", path)
+			}
+		}()
+	}
+
+	wg.Wait()
 }
 
 type busPublisherPlugin struct {
