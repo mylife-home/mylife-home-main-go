@@ -98,6 +98,10 @@ func (component *SmartTimerBinary) Init(runtime definitions.Runtime) error {
 	component.triggerProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigTriggerProgram, true)
 	component.cancelProgram = engine.NewProgram[bool](component.parseOutputValue, component.ConfigCancelProgram, false)
 
+	component.onProgressChan = make(chan *engine.ProgressArg)
+	component.onRunningChan = make(chan bool)
+	component.onOutputChan = make(chan *engine.OutputArg[bool])
+
 	component.pumpExited = make(chan struct{})
 	go component.pump()
 
@@ -124,6 +128,11 @@ func (component *SmartTimerBinary) Terminate() {
 	component.initProgram.OnOutput().Unsubscribe(component.onOutputChan)
 	component.triggerProgram.OnOutput().Unsubscribe(component.onOutputChan)
 	component.cancelProgram.OnOutput().Unsubscribe(component.onOutputChan)
+
+	close(component.onProgressChan)
+	close(component.onRunningChan)
+	close(component.onOutputChan)
+
 	<-component.pumpExited
 }
 

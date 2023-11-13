@@ -112,7 +112,7 @@ func (program *Program[Value]) Run(exit context.Context) bool {
 	defer program.onRunning.Update(false)
 	defer program.updateProgress(0)
 
-	run := newRunningData(program)
+	run := newRunningData(program, exit)
 
 	for _, step := range program.steps {
 		step.Execute(run)

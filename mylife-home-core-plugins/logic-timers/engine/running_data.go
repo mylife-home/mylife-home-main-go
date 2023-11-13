@@ -13,11 +13,12 @@ type runningData struct {
 	exit           context.Context
 }
 
-func newRunningData[Value any](program *Program[Value]) *runningData {
+func newRunningData[Value any](program *Program[Value], exit context.Context) *runningData {
 	return &runningData{
 		startTime:      time.Now(),
 		totalTime:      program.totalTime,
 		updateProgress: program.updateProgress,
+		exit:           exit,
 	}
 }
 

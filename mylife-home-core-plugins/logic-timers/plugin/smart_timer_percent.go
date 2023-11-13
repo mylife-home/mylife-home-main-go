@@ -99,6 +99,10 @@ func (component *SmartTimerPercent) Init(runtime definitions.Runtime) error {
 	component.triggerProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigTriggerProgram, true)
 	component.cancelProgram = engine.NewProgram[int64](component.parseOutputValue, component.ConfigCancelProgram, false)
 
+	component.onProgressChan = make(chan *engine.ProgressArg)
+	component.onRunningChan = make(chan bool)
+	component.onOutputChan = make(chan *engine.OutputArg[int64])
+
 	component.pumpExited = make(chan struct{})
 	go component.pump()
 
@@ -125,6 +129,11 @@ func (component *SmartTimerPercent) Terminate() {
 	component.initProgram.OnOutput().Unsubscribe(component.onOutputChan)
 	component.triggerProgram.OnOutput().Unsubscribe(component.onOutputChan)
 	component.cancelProgram.OnOutput().Unsubscribe(component.onOutputChan)
+
+	close(component.onProgressChan)
+	close(component.onRunningChan)
+	close(component.onOutputChan)
+
 	<-component.pumpExited
 }
 
