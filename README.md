@@ -44,18 +44,3 @@ docker build --pull -t "$DOCKER_IMAGE_TAG" .
 docker push "$DOCKER_IMAGE_TAG"
 exit
 ```
-
-## TODO
-
-- deploy absoluta on kube
-- test bindings
-  - normal ops
-  - source disconnects
-  - target disconnects
-  - binding types does not match
-  - source connects after target
-  - target connects after source
-- implements core plugins
-- test 'main'
-- implement mounted-fs store
-- test instance info rpi on rpi
