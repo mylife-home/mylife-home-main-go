@@ -7,6 +7,8 @@ MyLife Home Core, Golang implementation
 - common: `mylife-home-common/version/value.go`
 - core: `mylife-home-core/pkg/version/value.go`
 - plugins: `mylife-home-core-plugins/*/main.go`
+- update version number in [publish below](#publish)
+- release github
 
 ## New plugin
 
@@ -34,7 +36,9 @@ go generate mylife-home-core-plugins/ui-base/main.go
 go run mylife-home-core/main.go --log-console
 ```
 
-## Publish
+## Docker
+
+### publish
 
 ```shell
 # TODO: update version
@@ -43,4 +47,28 @@ export DOCKER_IMAGE_TAG="vincenttr/mylife-home-core:go-1.0.4"
 docker build --pull -t "$DOCKER_IMAGE_TAG" .
 docker push "$DOCKER_IMAGE_TAG"
 exit
+```
+
+### Investigate last crash
+
+```bash
+kubectl logs -n mylife-home pod-xxx -p
+```
+
+## Alpine/Raspberry
+
+- publish using rpi-alpine-build
+- test on rpi:
+
+```bash
+rc-service mylife-home-core stop
+
+apk del mylife-home-core mylife-home-core-plugins-logic-selectors mylife-home-core-plugins-logic-colors mylife-home-core-plugins-logic-timers mylife-home-core-plugins-logic-base mylife-home-core-plugins-ui-base
+apk add mylife-home-core-go
+
+vi /etc/mylife-home/config.yaml
+  your-should-override-this => localhost
+  supportsBindings => true
+
+rc-service mylife-home-core start
 ```
