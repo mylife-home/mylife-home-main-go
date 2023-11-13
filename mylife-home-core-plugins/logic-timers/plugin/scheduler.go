@@ -79,7 +79,7 @@ func (component *Scheduler) Terminate() {
 	<-ctx.Done()
 }
 
-// @Action(description="Permet de désactiver le scheduler. Le trigger reste alors à 'false'")
+// @Action(description="Permet de désactiver le scheduler. Le trigger reste alors à \"false\"")
 func (component *Scheduler) Disable(arg bool) {
 	value := !arg
 	component.Enabled.Set(value)

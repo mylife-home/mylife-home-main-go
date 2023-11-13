@@ -13,13 +13,13 @@ import (
 // @Plugin(usage="logic")
 type SmartTimerPercent struct {
 
-	// @Config(name="initProgram" description="Programme executé à l'initialisation du composant. Ex: 'o*-0' (Ne doit pas contenir de wait)")
+	// @Config(name="initProgram" description="Programme executé à l'initialisation du composant. Ex: \"o*-0\" (Ne doit pas contenir de wait)")
 	ConfigInitProgram string
 
-	// @Config(name="triggerProgram" description="Programme principal, lancé sur déclencheur. Ex: 'o0-50 w-1s o0-100 o1-50 w-1s o0-0 o1-0'")
+	// @Config(name="triggerProgram" description="Programme principal, lancé sur déclencheur. Ex: \"o0-50 w-1s o0-100 o1-50 w-1s o0-0 o1-0\"")
 	ConfigTriggerProgram string
 
-	// @Config(name="cancelProgram" description="Programme executé à l'arrêt de triggerProgram. Ex: 'o*-0' (Ne doit pas contenir de wait)")
+	// @Config(name="cancelProgram" description="Programme executé à l'arrêt de triggerProgram. Ex: \"o*-0\" (Ne doit pas contenir de wait)")
 	ConfigCancelProgram string
 
 	// @State(description="Temps total du programme, en secondes")

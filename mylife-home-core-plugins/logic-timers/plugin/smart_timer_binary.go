@@ -12,13 +12,13 @@ import (
 // @Plugin(usage="logic")
 type SmartTimerBinary struct {
 
-	// @Config(name="initProgram" description="Programme executé à l'initialisation du composant. Ex: 'o*-off' (Ne doit pas contenir de wait)")
+	// @Config(name="initProgram" description="Programme executé à l'initialisation du composant. Ex: \"o*-off\" (Ne doit pas contenir de wait)")
 	ConfigInitProgram string
 
-	// @Config(name="triggerProgram" description="Programme principal, lancé sur déclencheur. Ex: 'o0-on w-1s o0-off o1-on w-1s o1-off'")
+	// @Config(name="triggerProgram" description="Programme principal, lancé sur déclencheur. Ex: \"o0-on w-1s o0-off o1-on w-1s o1-off\"")
 	ConfigTriggerProgram string
 
-	// @Config(name="cancelProgram" description="Programme executé à l'arrêt de triggerProgram. Ex: 'o*-off' (Ne doit pas contenir de wait)")
+	// @Config(name="cancelProgram" description="Programme executé à l'arrêt de triggerProgram. Ex: \"o*-off\" (Ne doit pas contenir de wait)")
 	ConfigCancelProgram string
 
 	// @State(description="Temps total du programme, en secondes")

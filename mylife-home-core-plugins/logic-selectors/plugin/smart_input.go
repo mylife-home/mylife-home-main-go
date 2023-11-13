@@ -12,13 +12,13 @@ var logger = log.CreateLogger("mylife:home:core:plugins:logic-selectors:smart-in
 // @Plugin(usage="logic")
 type SmartInput struct {
 
-	// @Config(description="Séquence pour déclencher l'action. Ex: 'l ss' ou 'l|ss'")
+	// @Config(description="Séquence pour déclencher l'action. Ex: \"l ss\" ou \"l|ss\"")
 	Triggers0 string
-	// @Config(description="Séquence pour déclencher l'action. Ex: 'l ss' ou 'l|ss'")
+	// @Config(description="Séquence pour déclencher l'action. Ex: \"l ss\" ou \"l|ss\"")
 	Triggers1 string
-	// @Config(description="Séquence pour déclencher l'action. Ex: 'l ss' ou 'l|ss'")
+	// @Config(description="Séquence pour déclencher l'action. Ex: \"l ss\" ou \"l|ss\"")
 	Triggers2 string
-	// @Config(description="Séquence pour déclencher l'action. Ex: 'l ss' ou 'l|ss'")
+	// @Config(description="Séquence pour déclencher l'action. Ex: \"l ss\" ou \"l|ss\"")
 	Triggers3 string
 
 	// @State()
