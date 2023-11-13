@@ -111,27 +111,44 @@ func (logger *Logger) send(entry *publish.LogEntry) {
 }
 
 func (logger *Logger) waitOnline() bool {
-	ch := make(chan bool)
+	onlineChannel := make(chan bool)
+	resultChannel := make(chan bool, 1)
 
+	// We need to to this in a separate goroutine and wait for online chan close
+	// else we may block it
 	go func() {
-		// submit async else we will deadlock
-		logger.client.Online().Subscribe(ch, true)
-	}()
-	defer func() {
-		logger.client.Online().Unsubscribe(ch)
-	}()
+		hasResult := false
+		exitChannel := logger.exit
 
-	for {
-		select {
-		case <-logger.exit:
-			return false
+		for {
+			select {
+			case <-exitChannel:
+				if !hasResult {
+					hasResult = true
+					resultChannel <- false
+				}
+				exitChannel = nil // stop to poll exit, but wait for the onlineChannel to close
 
-		case online := <-ch:
-			if online {
-				return true
+			case online, ok := <-onlineChannel:
+				// continue to select until
+				if !ok {
+					return
+				}
+
+				if online && !hasResult {
+					hasResult = true
+					resultChannel <- true
+				}
 			}
 		}
-	}
+	}()
+
+	logger.client.Online().Subscribe(onlineChannel, true)
+	defer func() {
+		logger.client.Online().Unsubscribe(onlineChannel)
+	}()
+
+	return <-resultChannel
 }
 
 func (logger *Logger) serialize(entry *publish.LogEntry) ([]byte, error) {
