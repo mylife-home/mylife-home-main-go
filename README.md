@@ -55,7 +55,7 @@ exit
 kubectl logs -n mylife-home pod-xxx -p
 ```
 
-## Alpine/Raspberry
+## Alpine - Raspberry PI
 
 - publish using rpi-alpine-build
 - test on rpi:
