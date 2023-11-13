@@ -149,6 +149,8 @@ func (b *binding) refreshBinding() {
 
 		b.sourceState.Subscribe(b.sourceStateChan, true)
 
+		logger.Debugf("Binding '%s' activated", b.config)
+
 	} else {
 		// disable binding
 		b.sourceState.Unsubscribe(b.sourceStateChan)
@@ -156,6 +158,8 @@ func (b *binding) refreshBinding() {
 		b.sourceStateChan = nil
 		b.sourceState = nil
 		b.targetAction = nil
+
+		logger.Debugf("Binding '%s' deactivated", b.config)
 	}
 }
 
