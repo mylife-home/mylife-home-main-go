@@ -39,3 +39,21 @@ func GetString(key string) string {
 	logger.Debugf("Config '%s' fetched: %s", key, value)
 	return value
 }
+
+func FindString(key string) (string, bool) {
+	value, ok := conf.GetValue(key, false)
+
+	if !ok {
+		logger.Debugf("Config '%s' not fetched", key)
+		return "", false
+	}
+
+	str, ok := value.(string)
+	if !ok {
+		logger.Warnf("Config '%s' wrong value type '%+v'", key, value)
+		return "", false
+	}
+
+	logger.Debugf("Config '%s' fetched: %s", key, str)
+	return str, true
+}

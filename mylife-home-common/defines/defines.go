@@ -2,6 +2,7 @@ package defines
 
 import (
 	"fmt"
+	"mylife-home-common/config"
 	"os"
 
 	"github.com/gookit/goutil/errorx/panics"
@@ -14,6 +15,16 @@ var instanceNameValue string
 func Init(mainComponent string, mainComponentVersion string) {
 	mainComponentValue = mainComponent
 	mainComponentVersionValue = mainComponentVersion
+
+	initInstanceName()
+}
+
+func initInstanceName() {
+	instanceName, ok := config.FindString("instanceName")
+	if ok {
+		instanceNameValue = instanceName
+		return
+	}
 
 	hostname, err := os.Hostname()
 	if err != nil {

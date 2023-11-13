@@ -28,9 +28,9 @@ var rootCmd = &cobra.Command{
 }
 
 func run(_ *cobra.Command, _ []string) {
-	defines.Init("core", version.Value)
 	log.Init(logConsole)
 	config.Init(configFile)
+	defines.Init("core", version.Value)
 	instance_info.Init()
 	plugins.Build()
 

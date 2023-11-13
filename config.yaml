@@ -5,3 +5,4 @@ store:
   path: store.json
 manager:
   supportsBindings: true
+instanceName: "test-instance"
