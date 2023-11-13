@@ -2,6 +2,8 @@ package tools
 
 import (
 	"sync"
+
+	"github.com/gookit/goutil/errorx/panics"
 )
 
 type Observable[T any] interface {
@@ -66,6 +68,8 @@ func (sub *subject[T]) Notify(event T) {
 }
 
 func (sub *subject[T]) Subscribe(observer chan<- T) {
+	panics.IsTrue(observer != nil, "Subscribe with nil channel")
+
 	sub.mux.Lock()
 	defer sub.mux.Unlock()
 
@@ -73,6 +77,8 @@ func (sub *subject[T]) Subscribe(observer chan<- T) {
 }
 
 func (sub *subject[T]) Unsubscribe(observer chan<- T) {
+	panics.IsTrue(observer != nil, "Unsubscribe with nil channel")
+
 	sub.mux.Lock()
 	defer sub.mux.Unlock()
 
@@ -138,6 +144,8 @@ func (sub *subjectValue[T]) Update(newValue T) bool {
 }
 
 func (sub *subjectValue[T]) Subscribe(observer chan<- T, sendCurrent bool) {
+	panics.IsTrue(observer != nil, "Subscribe with nil channel")
+
 	if sendCurrent {
 		sub.valMux.RLock()
 		defer sub.valMux.RUnlock()
@@ -154,6 +162,8 @@ func (sub *subjectValue[T]) Subscribe(observer chan<- T, sendCurrent bool) {
 }
 
 func (sub *subjectValue[T]) Unsubscribe(observer chan<- T) {
+	panics.IsTrue(observer != nil, "Unsubscribe with nil channel")
+
 	sub.obsMux.Lock()
 	defer sub.obsMux.Unlock()
 
