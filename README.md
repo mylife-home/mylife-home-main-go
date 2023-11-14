@@ -8,7 +8,7 @@ MyLife Home Core, Golang implementation
 - core: `mylife-home-core/pkg/version/value.go`
 - plugins: `mylife-home-core-plugins/*/main.go`
 - update version number in [publish below](#publish)
-- release github
+- [release github](https://github.com/mylife-home/mylife-home-core-go/releases)
 
 ## New plugin
 
