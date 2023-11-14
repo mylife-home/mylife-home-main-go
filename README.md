@@ -43,9 +43,8 @@ go run mylife-home-core/main.go --log-console
 ```shell
 # TODO: update version
 bash
-export DOCKER_IMAGE_TAG="vincenttr/mylife-home-core:go-1.0.4"
-docker build --pull -t "$DOCKER_IMAGE_TAG" .
-docker push "$DOCKER_IMAGE_TAG"
+export DOCKER_IMAGE_TAG="vincenttr/mylife-home-core:go-1.0.5"
+docker build --pull -t "$DOCKER_IMAGE_TAG" . && docker push "$DOCKER_IMAGE_TAG"
 exit
 ```
 
@@ -63,7 +62,8 @@ kubectl logs -n mylife-home pod-xxx -p
 ```bash
 rc-service mylife-home-core stop
 
-apk del mylife-home-core mylife-home-core-plugins-logic-selectors mylife-home-core-plugins-logic-colors mylife-home-core-plugins-logic-timers mylife-home-core-plugins-logic-base mylife-home-core-plugins-ui-base
+apk del mylife-home-core mylife-home-core-plugins-logic-selectors mylife-home-core-plugins-logic-colors mylife-home-core-plugins-logic-timers mylife-home-core-plugins-logic-base mylife-home-core-plugins-ui-base mylife-home-core-plugins-driver-mpd mylife-home-core-plugins-driver-absoluta mylife-home-core-plugins-logic-clim mylife-home-core-plugins-driver-tahoma mylife-home-core-plugins-driver-broadlink
+
 apk add mylife-home-core-go
 
 vi /etc/mylife-home/config.yaml
