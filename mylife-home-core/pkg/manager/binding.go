@@ -183,7 +183,7 @@ func (b *binding) validate() bool {
 	if sourceState != nil && targetAction != nil {
 		sourceType := sourceState.ValueType()
 		targetType := targetAction.ValueType()
-		if !metadata.TypeEquals(sourceType, targetType) {
+		if !sourceType.Equals(targetType) {
 			sourceDesc := fmt.Sprintf("State '%s' on component %s", sourceState.Name(), b.buildComponentFullId(b.sourceInstance, b.source))
 			targetDesc := fmt.Sprintf("action '%s' on component %s", targetAction.Name(), b.buildComponentFullId(b.targetInstance, b.target))
 			err := fmt.Sprintf("%s has type '%s', which is different from type '%s' for %s", sourceDesc, sourceType, targetType, targetDesc)

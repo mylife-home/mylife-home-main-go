@@ -2,8 +2,6 @@ package metadata
 
 import (
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -12,95 +10,7 @@ import (
 type Type interface {
 	String() string
 	Validate(value any) bool
-}
-
-var parser = regexp.MustCompile(`([a-z]+)(.*)`)
-var rangeParser = regexp.MustCompile(`\[(-?\d+);(-?\d+)\]`)
-var enumParser = regexp.MustCompile(`{(.[\w_\-,]+)}`)
-
-func ParseType(value string) (Type, error) {
-	matchs := parser.FindStringSubmatch(value)
-	if matchs == nil {
-		return nil, fmt.Errorf("invalid type '%s'", value)
-	}
-
-	var baseType, args string
-
-	switch len(matchs) {
-	case 2:
-		baseType = matchs[1]
-
-	case 3:
-		baseType = matchs[1]
-		args = matchs[2]
-
-	default:
-		return nil, fmt.Errorf("invalid type '%s' (bad match len)", value)
-	}
-
-	switch baseType {
-	case "range":
-		matchs := rangeParser.FindStringSubmatch(args)
-		if matchs == nil || len(matchs) != 3 {
-			return nil, fmt.Errorf("invalid type '%s' (bad args)", value)
-		}
-
-		min, err := strconv.ParseInt(matchs[1], 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid type '%s' (%f)", value, err)
-		}
-
-		max, err := strconv.ParseInt(matchs[2], 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid type '%s' (%f)", value, err)
-		}
-
-		if min >= max {
-			return nil, fmt.Errorf("invalid type '%s' (min >= mX)", value)
-		}
-
-		return &RangeType{min: min, max: max}, nil
-
-	case "text":
-		if args != "" {
-			return nil, fmt.Errorf("invalid type '%s' (unexpected args)", value)
-		}
-		return &TextType{}, nil
-
-	case "float":
-		if args != "" {
-			return nil, fmt.Errorf("invalid type '%s' (unexpected args)", value)
-		}
-		return &FloatType{}, nil
-
-	case "bool":
-		if args != "" {
-			return nil, fmt.Errorf("invalid type '%s' (unexpected args)", value)
-		}
-		return &BoolType{}, nil
-
-	case "enum":
-		matchs := enumParser.FindStringSubmatch(args)
-		if matchs == nil || len(matchs) != 2 {
-			return nil, fmt.Errorf("invalid type '%s' (bad args)", value)
-		}
-
-		values := strings.Split(matchs[1], ",")
-		if len(values) < 2 {
-			return nil, fmt.Errorf("invalid type '%s' (bad args)", value)
-		}
-
-		return &EnumType{values: values}, nil
-
-	case "complex":
-		if args != "" {
-			return nil, fmt.Errorf("invalid type '%s' (unexpected args)", value)
-		}
-		return &ComplexType{}, nil
-
-	default:
-		return nil, fmt.Errorf("invalid type '%s' (unknown type)", value)
-	}
+	Equals(other Type) bool
 }
 
 type RangeType struct {
@@ -129,6 +39,15 @@ func (typ *RangeType) Max() int64 {
 	return typ.max
 }
 
+func (typ *RangeType) Equals(other Type) bool {
+	otherRange, ok := other.(*RangeType)
+	if !ok {
+		return false
+	}
+
+	return typ.min == otherRange.min && typ.max == otherRange.max
+}
+
 type TextType struct {
 }
 
@@ -138,6 +57,11 @@ func (typ *TextType) String() string {
 
 func (typ *TextType) Validate(value any) bool {
 	_, ok := value.(string)
+	return ok
+}
+
+func (typ *TextType) Equals(other Type) bool {
+	_, ok := other.(*TextType)
 	return ok
 }
 
@@ -153,6 +77,11 @@ func (typ *FloatType) Validate(value any) bool {
 	return ok
 }
 
+func (typ *FloatType) Equals(other Type) bool {
+	_, ok := other.(*FloatType)
+	return ok
+}
+
 type BoolType struct {
 }
 
@@ -162,6 +91,11 @@ func (typ *BoolType) String() string {
 
 func (typ *BoolType) Validate(value any) bool {
 	_, ok := value.(bool)
+	return ok
+}
+
+func (typ *BoolType) Equals(other Type) bool {
+	_, ok := other.(*BoolType)
 	return ok
 }
 
@@ -180,6 +114,30 @@ func (typ *EnumType) Validate(value any) bool {
 	}
 
 	return slices.Contains(typ.values, strValue)
+}
+
+func (typ *EnumType) Equals(other Type) bool {
+	otherEnum, ok := other.(*EnumType)
+	if !ok {
+		return false
+	}
+
+	if len(typ.values) != len(otherEnum.values) {
+		return false
+	}
+
+	values := make(map[string]struct{})
+	for _, value := range typ.values {
+		values[value] = struct{}{}
+	}
+
+	for _, value := range otherEnum.values {
+		if _, exists := values[value]; !exists {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (typ *EnumType) NumValues() int {
@@ -201,6 +159,7 @@ func (typ *ComplexType) Validate(value any) bool {
 	return true
 }
 
-func TypeEquals(t1 Type, t2 Type) bool {
-	return t1.String() == t2.String()
+func (typ *ComplexType) Equals(other Type) bool {
+	_, ok := other.(*ComplexType)
+	return ok
 }

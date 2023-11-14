@@ -22,9 +22,14 @@ func MakeTypeBool() Type {
 	return &BoolType{}
 }
 
-// Note: values should be sorted
 func MakeTypeEnum(values ...string) Type {
-	panics.IsTrue(values != nil && len(values) > 0)
+	panics.IsTrue(len(values) > 0)
+
+	uniques := make(map[string]struct{})
+	for _, value := range values {
+		uniques[value] = struct{}{}
+	}
+	panics.IsTrue(len(uniques) == len(values))
 
 	return &EnumType{values}
 }

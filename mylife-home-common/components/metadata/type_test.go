@@ -39,3 +39,10 @@ func TestParseEnum(t *testing.T) {
 func TestParseComplex(t *testing.T) {
 	testParseType(t, "complex")
 }
+
+func TestEnumEquals(t *testing.T) {
+	e1 := MakeTypeEnum("one", "two")
+	e2 := MakeTypeEnum("two", "one")
+
+	assert.True(t, e1.Equals(e2))
+}
