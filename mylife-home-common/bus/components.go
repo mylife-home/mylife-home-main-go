@@ -70,6 +70,15 @@ func (disp *dispatcher) AddSubscription(member string, handler func([]byte)) {
 	topic := disp.buildTopic(member)
 
 	cb := func(m *message) {
+		// Note:
+		// All component payloads are supposed to contain values.
+		// If we get a message without payload, this is probably a state cleanup of a component going offline.
+		// In any case, we do not transmit.
+		if len(m.Payload()) == 0 {
+			logger.Warnf("Got message without payload (topic='%s', retained='%t')", m.Topic(), m.Retained())
+			return
+		}
+
 		handler(m.Payload())
 	}
 
