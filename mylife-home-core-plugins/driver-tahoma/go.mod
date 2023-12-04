@@ -2,6 +2,8 @@ module mylife-home-core-plugins-driver-tahoma
 
 go 1.21.1
 
+replace github.com/sgrimee/kizcool => github.com/vincent-tr/kizcool v0.0.0-20231204090851-2efc096aadc2
+
 require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sgrimee/kizcool v0.0.0-20191223231822-10e10a24e73a // indirect
