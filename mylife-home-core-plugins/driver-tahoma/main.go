@@ -1,6 +1,6 @@
 //go:generate go run ../../mylife-home-core-generator/cmd/main.go .
 
-// @Module(version="1.0.2")
+// @Module(version="1.0.3")
 package plugin_entry
 
 import (

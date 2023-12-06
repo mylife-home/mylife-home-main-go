@@ -43,7 +43,7 @@ go run mylife-home-core/main.go --log-console
 ```shell
 # TODO: update version
 bash
-export DOCKER_IMAGE_TAG="vincenttr/mylife-home-core:go-1.0.8"
+export DOCKER_IMAGE_TAG="vincenttr/mylife-home-core:go-1.0.9"
 docker build --pull -t "$DOCKER_IMAGE_TAG" . && docker push "$DOCKER_IMAGE_TAG"
 exit
 ```
