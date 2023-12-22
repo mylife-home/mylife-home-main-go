@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sgrimee/kizcool"
+	"github.com/vincent-tr/kizcool"
 )
 
 // https://ha101-1.overkiz.com/enduser-mobile-web

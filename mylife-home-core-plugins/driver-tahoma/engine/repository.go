@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/gookit/goutil/errorx/panics"
-	"github.com/sgrimee/kizcool"
+	"github.com/vincent-tr/kizcool"
 	"golang.org/x/exp/maps"
 )
 

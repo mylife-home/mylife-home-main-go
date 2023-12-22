@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sgrimee/kizcool"
+	"github.com/vincent-tr/kizcool"
 )
 
 type StateRefresh struct {
