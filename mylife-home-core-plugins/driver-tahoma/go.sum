@@ -7,8 +7,8 @@ github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
-github.com/vincent-tr/kizcool v0.0.0-20231222170011-83ce74176f48 h1:YMY+YT/iQK+LRM1lABcdrLaeFe9A7r9OMufWNsvfW38=
-github.com/vincent-tr/kizcool v0.0.0-20231222170011-83ce74176f48/go.mod h1:MUzVZRTb1dkTKOEvRAlKVclEg+sc3yMnfUrLnQnrGPw=
+github.com/vincent-tr/kizcool v0.0.0-20231226194118-f7a6a58ed2c9 h1:1RXufzycLp5V5v8a/rqUr3/Ih6E14NJhOv+R7WMMooM=
+github.com/vincent-tr/kizcool v0.0.0-20231226194118-f7a6a58ed2c9/go.mod h1:MUzVZRTb1dkTKOEvRAlKVclEg+sc3yMnfUrLnQnrGPw=
 golang.org/x/net v0.17.0 h1:pVaXccu2ozPjCXewfr1S7xza/zcXTity9cCdXQYSjIM=
 golang.org/x/net v0.17.0/go.mod h1:NxSsAGuq816PNPmqtQdLE42eU2Fs7NoRIZrHJAlaCOE=
 golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
