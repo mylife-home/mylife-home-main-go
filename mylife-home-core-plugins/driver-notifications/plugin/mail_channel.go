@@ -14,18 +14,24 @@ type MailChannel struct {
 	// @Config(description="Serveur SMTP")
 	SmtpServer string
 
+	// @Config(description="Port SMTP")
+	SmtpPort int64
+
 	// @Config(description="Nom de connexion au serveur")
 	User string
 
 	// @Config(description="Mot de passe de connexion au serveur")
 	Pass string
 
-	// @Config(description="Liste de mails destinataires séparés par ';'")
+	// @Config(description="Emetteur")
+	From string
+
+	// @Config(description="Liste de destinataires séparés par ';'")
 	To string
 }
 
 func (channel *MailChannel) Init(runtime definitions.Runtime) error {
-	engine.Register(channel.Key, engine.NewMailChannel(channel.SmtpServer, channel.User, channel.Pass, strings.Split(channel.To, ";")))
+	engine.Register(channel.Key, engine.NewMailChannel(channel.SmtpServer, channel.SmtpPort, channel.User, channel.Pass, channel.From, strings.Split(channel.To, ";")))
 
 	return nil
 }

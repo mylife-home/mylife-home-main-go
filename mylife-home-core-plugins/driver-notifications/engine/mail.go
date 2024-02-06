@@ -2,20 +2,23 @@ package engine
 
 import (
 	"bytes"
-	"fmt"
-	"net/smtp"
 	"text/template"
+
+	gomail "gopkg.in/mail.v2"
 )
 
-func NewMailChannel(smtpServer string, user string, pass string, to []string) Channel {
-	return &mailChannel{smtpServer, user, pass, to}
+func NewMailChannel(smtpServer string, smtpPort int64, user string, pass string, from string, to []string) Channel {
+	return &mailChannel{
+		dialer: gomail.NewDialer(smtpServer, int(smtpPort), user, pass),
+		from:   from,
+		to:     to,
+	}
 }
 
 type mailChannel struct {
-	host string
-	user string
-	pass string
-	to   []string
+	dialer *gomail.Dialer
+	from   string
+	to     []string
 }
 
 func (channel *mailChannel) Send(title string, text string) {
@@ -23,37 +26,32 @@ func (channel *mailChannel) Send(title string, text string) {
 }
 
 func (channel *mailChannel) sendSync(title string, text string) {
-	auth := smtp.PlainAuth("", channel.user, channel.pass, channel.host)
-	msg := createMessage(title, text)
+	msg := gomail.NewMessage()
 
-	err := smtp.SendMail(channel.host+":587", auth, channel.user, channel.to, msg)
+	msg.SetHeader("From", channel.from)
+	msg.SetHeader("To", channel.to...)
+	msg.SetHeader("Subject", title)
 
-	if err != nil {
+	var body bytes.Buffer
+	model.Execute(&body, struct{ Content string }{Content: template.HTMLEscapeString(text)})
+	msg.SetBody("text/html", body.String())
+
+	err := channel.dialer.DialAndSend(msg)
+
+	if err == nil {
+		logger.Infof("Mail sent from '%s'", channel.dialer.Username)
+	} else {
 		logger.Errorf("Error sending mail: %s", err)
 	}
 }
 
 var model = template.Must(template.New("mail").Parse(`
   <!DOCTYPE html>
-  <html>
+  <html style="color:#4da6ff; font-family: -apple-system,BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, Liberation Sans, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji ;">
     <body>
-      {{.Content}}
+			<p style="border: solid; border-color:#4da6ff; border-width: 1px; padding: 12px; margin: 12px;">
+      	{{.Content}}
+			</p>
     </body>
   </html>
 `))
-
-var mimeHeaders = "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
-
-func createMessage(title string, text string) []byte {
-	var body bytes.Buffer
-
-	body.Write([]byte(fmt.Sprintf("Subject: %s \n%s\n\n", title, mimeHeaders)))
-
-	model.Execute(&body, struct {
-		Content string
-	}{
-		Content: template.HTMLEscapeString(text),
-	})
-
-	return body.Bytes()
-}
