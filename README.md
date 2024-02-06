@@ -21,6 +21,7 @@ MyLife Home Core, Golang implementation
 
 ```shell
 go generate mylife-home-core-plugins/driver-absoluta/main.go
+go generate mylife-home-core-plugins/driver-notifications/main.go
 go generate mylife-home-core-plugins/driver-tahoma/main.go
 go generate mylife-home-core-plugins/logic-base/main.go
 go generate mylife-home-core-plugins/logic-clim/main.go
