@@ -16,6 +16,7 @@ MyLife Home Core, Golang implementation
 - Add `Generate` doc below
 - Add generate in `Dockerfile`
 - Add plugin in `mylife-home-core/main.go`
+- Add plugin in `rpi-alpine-build APKBUILD`
 
 ## Generate
 
