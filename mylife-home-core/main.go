@@ -5,6 +5,7 @@ import (
 
 	// Plugin list here
 	_ "mylife-home-core-plugins-driver-absoluta"
+	_ "mylife-home-core-plugins-driver-klf200"
 	_ "mylife-home-core-plugins-driver-notifications"
 	_ "mylife-home-core-plugins-driver-tahoma"
 	_ "mylife-home-core-plugins-logic-base"

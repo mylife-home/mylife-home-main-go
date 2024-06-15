@@ -6,6 +6,7 @@ use (
 	./mylife-home-core-generator
 	./mylife-home-core-library
 	./mylife-home-core-plugins/driver-absoluta
+	./mylife-home-core-plugins/driver-klf200
 	./mylife-home-core-plugins/driver-notifications
 	./mylife-home-core-plugins/driver-tahoma
 	./mylife-home-core-plugins/logic-base
