@@ -32,11 +32,7 @@ func (component *Box) Init(runtime definitions.Runtime) error {
 	tools.DispatchChannel(component.storeOnlineChangedChan, component.handleOnlineChanged)
 	component.store.Online().Subscribe(component.storeOnlineChangedChan, true)
 
-	client, err := engine.MakeClient(component.Address, component.Password)
-	if err != nil {
-		logger.WithError(err).Error("Error at client init")
-		return nil
-	}
+	client := engine.MakeClient(component.Address, component.Password)
 
 	component.client = client
 	component.store.SetClient(component.client)
