@@ -14,11 +14,14 @@ import (
 
 const timeout = time.Second * 10
 const refreshDevices = time.Minute * 1
+const refreshStates = time.Second * 10
 
 type Client struct {
-	client  *klf200.Client
-	online  tools.SubjectValue[bool]
-	devices tools.Subject[[]*Device]
+	client        *klf200.Client
+	online        tools.SubjectValue[bool]
+	devices       tools.Subject[[]*Device]
+	deviceIndexes []int
+	states        tools.Subject[[]*klf200.StatusData]
 
 	ctx        context.Context
 	close      context.CancelFunc
@@ -29,11 +32,13 @@ func MakeClient(address string, password string) *Client {
 	ctx, close := context.WithCancel(context.Background())
 
 	client := &Client{
-		client:  klf200.MakeClient(address, password, klf200logger),
-		online:  tools.MakeSubjectValue(false),
-		devices: tools.MakeSubject[[]*Device](),
-		ctx:     ctx,
-		close:   close,
+		client:        klf200.MakeClient(address, password, klf200logger),
+		online:        tools.MakeSubjectValue(false),
+		devices:       tools.MakeSubject[[]*Device](),
+		deviceIndexes: make([]int, 0),
+		states:        tools.MakeSubject[[]*klf200.StatusData](),
+		ctx:           ctx,
+		close:         close,
 	}
 
 	client.client.RegisterStatusChange(client.statusChange)
@@ -57,8 +62,9 @@ func (client *Client) statusChange(cs klf200.ConnectionStatus) {
 	switch cs {
 	case klf200.ConnectionOpen:
 		client.online.Update(true)
-		// refresh devices on connection
+		// refresh devices/states on connection
 		client.refreshDevices()
+		client.refreshStates()
 	case klf200.ConnectionClosed, klf200.ConnectionHandshaking:
 		client.online.Update(false)
 	}
@@ -72,6 +78,10 @@ func (client *Client) Devices() tools.Observable[[]*Device] {
 	return client.devices
 }
 
+func (client *Client) States() tools.Observable[[]*klf200.StatusData] {
+	return client.states
+}
+
 func (client *Client) worker() {
 	defer client.workerSync.Done()
 
@@ -81,23 +91,10 @@ func (client *Client) worker() {
 			return
 		case <-time.After(refreshDevices):
 			client.refreshDevices()
+		case <-time.After(refreshStates):
+			client.refreshStates()
 		}
 	}
-
-}
-
-func (client *Client) getSystemTable() ([]commands.SystemtableObject, error) {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
-	defer ctxCancel()
-
-	return client.client.Config().GetSystemTable(ctx)
-}
-
-func (client *Client) getNodesInfo() ([]*commands.GetAllNodesInformationNtf, error) {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
-	defer ctxCancel()
-
-	return client.client.Info().GetAllNodesInformation(ctx)
 }
 
 func (client *Client) refreshDevices() {
@@ -145,4 +142,40 @@ func (client *Client) refreshDevices() {
 	}
 
 	client.devices.Notify(maps.Values(devices))
+	client.deviceIndexes = maps.Keys(devices)
+}
+
+func (client *Client) refreshStates() {
+	if !client.online.Get() {
+		return
+	}
+
+	states, err := client.getStatus(client.deviceIndexes)
+	if err != nil {
+		log.WithError(err).Error("could not get states")
+		return
+	}
+
+	client.states.Notify(states)
+}
+
+func (client *Client) getSystemTable() ([]commands.SystemtableObject, error) {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
+	defer ctxCancel()
+
+	return client.client.Config().GetSystemTable(ctx)
+}
+
+func (client *Client) getNodesInfo() ([]*commands.GetAllNodesInformationNtf, error) {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
+	defer ctxCancel()
+
+	return client.client.Info().GetAllNodesInformation(ctx)
+}
+
+func (client *Client) getStatus(nodeIndexes []int) ([]*klf200.StatusData, error) {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
+	defer ctxCancel()
+
+	return client.client.Commands().Status(ctx, nodeIndexes)
 }

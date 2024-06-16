@@ -1,6 +1,8 @@
 package engine
 
-import "github.com/mylife-home/klf200-go/commands"
+import (
+	"github.com/mylife-home/klf200-go/commands"
+)
 
 type Device struct {
 	index   int
@@ -23,4 +25,20 @@ func (dev *Device) Name() string {
 
 func (dev *Device) Type() commands.ActuatorType {
 	return dev.typ
+}
+
+type DeviceState struct {
+	deviceIndex int
+
+	currentPosition int // percent, 0 = closed, 100 = open
+
+	// TODO: add execution data
+}
+
+func (state *DeviceState) DeviceIndex() int {
+	return state.deviceIndex
+}
+
+func (state *DeviceState) CurrentPosition() int {
+	return state.currentPosition
 }
