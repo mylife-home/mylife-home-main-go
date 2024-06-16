@@ -179,3 +179,17 @@ func (client *Client) getStatus(nodeIndexes []int) ([]*klf200.StatusData, error)
 
 	return client.client.Commands().Status(ctx, nodeIndexes)
 }
+
+func (client *Client) ChangePosition(nodeIndex int, position commands.MPValue) (*klf200.Session, error) {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
+	defer ctxCancel()
+
+	return client.client.Commands().ChangePosition(ctx, nodeIndex, position)
+}
+
+func (client *Client) Mode(nodeIndex int) (*klf200.Session, error) {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
+	defer ctxCancel()
+
+	return client.client.Commands().Mode(ctx, nodeIndex)
+}

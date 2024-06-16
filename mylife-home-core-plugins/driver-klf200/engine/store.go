@@ -6,6 +6,7 @@ import (
 
 	"github.com/gookit/goutil/errorx/panics"
 	"github.com/mylife-home/klf200-go"
+	"github.com/mylife-home/klf200-go/commands"
 	"golang.org/x/exp/maps"
 )
 
@@ -240,4 +241,61 @@ func (store *Store) refreshState(state *klf200.StatusData) {
 		logger.Debugf("Device state changed: device %d => %d", newState.DeviceIndex(), newState.CurrentPosition())
 		store.onStateChanged.Notify(newState)
 	}
+}
+
+type Command interface {
+	execute(client *Client, deviceIndex int) (*klf200.Session, error)
+}
+
+type modeCommand struct {
+}
+
+func (*modeCommand) execute(client *Client, deviceIndex int) (*klf200.Session, error) {
+	return client.Mode(deviceIndex)
+}
+
+func MakeModeCommand() Command {
+	return &modeCommand{}
+}
+
+type changePositionCommand struct {
+	position commands.MPValue
+}
+
+func (cmd *changePositionCommand) execute(client *Client, deviceIndex int) (*klf200.Session, error) {
+	return client.ChangePosition(deviceIndex, cmd.position)
+}
+
+func MakeChangeAbsoluteCommand(value int) Command {
+	return &changePositionCommand{position: commands.NewMPValueAbsolute(100 - value)}
+}
+
+func MakeChangeRelativeCommand(value int) Command {
+	return &changePositionCommand{position: commands.NewMPValueRelative(-value)}
+}
+
+func MakeStopCommand() Command {
+	return &changePositionCommand{position: commands.NewMPValueCurrent()}
+}
+
+func (store *Store) Execute(deviceIndex int, command Command) {
+	store.mux.Lock()
+	defer store.mux.Unlock()
+
+	client := store.client
+
+	if client == nil {
+		logger.Warn("Execute without client, ignored")
+		return
+	}
+
+	session, err := command.execute(client, deviceIndex)
+
+	if err != nil {
+		logger.WithError(err).Errorf("could not execute command on device %d", deviceIndex)
+		return
+	}
+
+	// TODO: use session to get execution data
+	_ = session
 }

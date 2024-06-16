@@ -72,36 +72,41 @@ func (component *RollerShutter) Terminate() {
 
 // @Action()
 func (component *RollerShutter) DoOpen(arg bool) {
-	if component.Online.Get() && arg {
-		// component.store.Execute()
+	dev := component.device
+	if component.Online.Get() && arg && dev != nil {
+		component.store.Execute(dev.Index(), engine.MakeChangeAbsoluteCommand(100))
 	}
 }
 
 // @Action()
 func (component *RollerShutter) DoClose(arg bool) {
-	if component.Online.Get() && arg {
-		// component.store.Execute()
+	dev := component.device
+	if component.Online.Get() && arg && dev != nil {
+		component.store.Execute(dev.Index(), engine.MakeChangeAbsoluteCommand(0))
 	}
 }
 
 // @Action()
 func (component *RollerShutter) Toggle(arg bool) {
-	if component.Online.Get() && arg {
-		// component.store.Execute()
+	dev := component.device
+	if component.Online.Get() && arg && dev != nil {
+		component.store.Execute(dev.Index(), engine.MakeModeCommand())
 	}
 }
 
 // @Action(type="range[-1;100]")
 func (component *RollerShutter) SetValue(arg int64) {
-	if component.Online.Get() && arg != -1 {
-		// component.store.Execute()
+	dev := component.device
+	if component.Online.Get() && arg != -1 && dev != nil {
+		component.store.Execute(dev.Index(), engine.MakeChangeAbsoluteCommand(int(arg)))
 	}
 }
 
 // @Action()
 func (component *RollerShutter) Interrupt(arg bool) {
-	if component.Online.Get() && arg {
-		// component.store.Execute()
+	dev := component.device
+	if component.Online.Get() && arg && dev != nil {
+		component.store.Execute(dev.Index(), engine.MakeStopCommand())
 	}
 }
 
