@@ -5,5 +5,5 @@ go 1.22.3
 toolchain go1.22.4
 
 require (
-	github.com/mylife-home/klf200-go v1.0.1 // indirect
+	github.com/mylife-home/klf200-go v1.0.2 // indirect
 )
