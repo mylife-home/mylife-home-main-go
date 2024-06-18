@@ -53,6 +53,11 @@ func (component *RollerShutter) Init(runtime definitions.Runtime) error {
 	component.store.OnDeviceChanged().Subscribe(component.storeDeviceChangedChan)
 	component.store.OnStateChanged().Subscribe(component.storeStateChangedChan)
 
+	device := component.store.GetDevice(component.DeviceName)
+	if device != nil {
+		component.handleDeviceChanged(&engine.DeviceChange{})
+	}
+
 	return nil
 }
 
@@ -130,8 +135,19 @@ func (component *RollerShutter) handleDeviceChanged(arg *engine.DeviceChange) {
 
 	switch arg.Operation() {
 	case engine.OperationAdd:
+
 		component.device = device
+
+		go func() {
+			// avoid deadlock
+			state := component.store.GetState(device.Index())
+			if state != nil {
+				component.handleStateChanged(state)
+			}
+		}()
+
 	case engine.OperationRemove:
+
 		component.device = nil
 	}
 

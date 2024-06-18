@@ -22,6 +22,13 @@ type DeviceChange struct {
 	operation Operation
 }
 
+func MakeDeviceChange(dev *Device, op Operation) *DeviceChange {
+	return &DeviceChange{
+		device:    dev,
+		operation: op,
+	}
+}
+
 func (change *DeviceChange) Device() *Device {
 	return change.device
 }
@@ -182,10 +189,7 @@ func (store *Store) addDevice(device *Device) {
 
 	logger.Debugf("Device joined '%s' (%d)", name, device.Index())
 
-	store.onDeviceChanged.Notify(&DeviceChange{
-		device:    device,
-		operation: OperationAdd,
-	})
+	store.onDeviceChanged.Notify(MakeDeviceChange(device, OperationAdd))
 }
 
 func (store *Store) removeDevice(device *Device) {
@@ -196,10 +200,7 @@ func (store *Store) removeDevice(device *Device) {
 
 	logger.Debugf("Device left '%s' (%d)", name, device.Index())
 
-	store.onDeviceChanged.Notify(&DeviceChange{
-		device:    device,
-		operation: OperationRemove,
-	})
+	store.onDeviceChanged.Notify(MakeDeviceChange(device, OperationRemove))
 }
 
 func (store *Store) clearDevices() {
@@ -207,10 +208,7 @@ func (store *Store) clearDevices() {
 		delete(store.devices, device.Name())
 		delete(store.states, device.Index())
 
-		store.onDeviceChanged.Notify(&DeviceChange{
-			device:    device,
-			operation: OperationRemove,
-		})
+		store.onDeviceChanged.Notify(MakeDeviceChange(device, OperationRemove))
 	}
 }
 
