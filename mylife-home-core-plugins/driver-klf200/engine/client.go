@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apex/log"
 	"github.com/mylife-home/klf200-go"
 	"github.com/mylife-home/klf200-go/commands"
 	"golang.org/x/exp/maps"
@@ -104,13 +103,13 @@ func (client *Client) refreshDevices() {
 
 	objects, err := client.getSystemTable()
 	if err != nil {
-		log.WithError(err).Error("could not get system table")
+		logger.WithError(err).Error("could not get system table")
 		return
 	}
 
 	nodes, err := client.getNodesInfo()
 	if err != nil {
-		log.WithError(err).Error("could not get nodes info")
+		logger.WithError(err).Error("could not get nodes info")
 		return
 	}
 
@@ -152,7 +151,7 @@ func (client *Client) refreshStates() {
 
 	states, err := client.getStatus(client.deviceIndexes)
 	if err != nil {
-		log.WithError(err).Error("could not get states")
+		logger.WithError(err).Error("could not get states")
 		return
 	}
 
