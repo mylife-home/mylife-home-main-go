@@ -3,7 +3,6 @@ package engine
 import (
 	"mylife-home-core-plugins-driver-absoluta/engine/itv2"
 	"mylife-home-core-plugins-driver-absoluta/engine/itv2/commands"
-	"reflect"
 	"time"
 )
 
@@ -130,6 +129,6 @@ func (svc *Service) handleNotification(cmd commands.Command) {
 		}
 
 	default:
-		logger.Debugf("Got notification %s %+v", reflect.TypeOf(cmd), cmd)
+		// logger.Debugf("Got notification %s %+v", reflect.TypeOf(cmd), cmd)
 	}
 }
