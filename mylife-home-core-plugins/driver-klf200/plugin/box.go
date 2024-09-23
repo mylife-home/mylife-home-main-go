@@ -54,6 +54,13 @@ func (component *Box) Terminate() {
 	engine.ReleaseStore(component.BoxKey)
 }
 
+// @Action()
+func (component *Box) Reboot(arg bool) {
+	if arg {
+		component.client.Reboot()
+	}
+}
+
 func (component *Box) handleOnlineChanged(value bool) {
 	component.Online.Set(value)
 }

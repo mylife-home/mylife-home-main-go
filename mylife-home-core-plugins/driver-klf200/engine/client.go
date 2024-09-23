@@ -16,6 +16,8 @@ const refreshDevices = time.Minute * 1
 const refreshStates = time.Second * 10
 
 type Client struct {
+	address       string
+	password      string
 	client        *klf200.Client
 	online        tools.SubjectValue[bool]
 	devices       tools.Subject[[]*Device]
@@ -31,6 +33,8 @@ func MakeClient(address string, password string) *Client {
 	ctx, close := context.WithCancel(context.Background())
 
 	client := &Client{
+		address:       address,
+		password:      password,
 		client:        klf200.MakeClient(address, password, klf200logger),
 		online:        tools.MakeSubjectValue(false),
 		devices:       tools.MakeSubject[[]*Device](),
@@ -60,6 +64,7 @@ func (client *Client) Terminate() {
 func (client *Client) statusChange(cs klf200.ConnectionStatus) {
 	switch cs {
 	case klf200.ConnectionOpen:
+		client.checkReboot()
 		client.online.Update(true)
 		// refresh devices/states on connection
 		client.refreshDevices()
@@ -179,6 +184,14 @@ func (client *Client) getStatus(nodeIndexes []int) ([]*klf200.StatusData, error)
 	return client.client.Commands().Status(ctx, nodeIndexes)
 }
 
+func (client *Client) Reboot() {
+	if err := client.client.Device().Reboot(); err != nil {
+		logger.WithError(err).Error("could not reboot")
+	}
+
+	logger.Info("Box rebooted")
+}
+
 func (client *Client) ChangePosition(nodeIndex int, position commands.MPValue) (*klf200.Session, error) {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
 	defer ctxCancel()
@@ -191,4 +204,35 @@ func (client *Client) Mode(nodeIndex int) (*klf200.Session, error) {
 	defer ctxCancel()
 
 	return client.client.Commands().Mode(ctx, nodeIndex)
+}
+
+// KLF200 has 2 possible sockets (connections). But if a connection is hardly broken, KLF200 leaks it.
+// On connection, we check if we can do another connection, and properly disconnect.
+// If we cannot, the other connection is leaked, and we reboot.
+func (client *Client) checkReboot() {
+	if !client.checkSecondConnection() {
+		logger.Info("Could not use the second box connection, rebooting")
+		client.Reboot()
+	}
+}
+
+func (client *Client) checkSecondConnection() bool {
+	connOk := make(chan struct{})
+
+	testClient := klf200.MakeClient(client.address, client.password, klf200logger)
+	testClient.RegisterStatusChange(func(cs klf200.ConnectionStatus) {
+		if cs == klf200.ConnectionOpen {
+			close(connOk)
+		}
+	})
+
+	testClient.Start()
+	defer testClient.Close()
+
+	select {
+	case <-time.After(time.Second * 30):
+		return false
+	case <-connOk:
+		return true
+	}
 }
