@@ -7,7 +7,6 @@ MyLife Home Core, Golang implementation
 - common: `mylife-home-common/version/value.go`
 - core: `mylife-home-core/pkg/version/value.go`
 - plugins: `mylife-home-core-plugins/*/main.go`
-- update version number in [publish below](#publish)
 - [release github](https://github.com/mylife-home/mylife-home-core-go/releases)
 
 ## New plugin
@@ -36,7 +35,7 @@ go generate mylife-home-core-plugins/ui-base/main.go
 ## Run
 
 ```shell
-go run mylife-home-core/main.go --log-console
+make run
 ```
 
 ## Docker
@@ -44,11 +43,8 @@ go run mylife-home-core/main.go --log-console
 ### publish
 
 ```shell
-# TODO: update version
-bash
-export DOCKER_IMAGE_TAG="vincenttr/mylife-home-core:go-1.0.16"
-docker build --pull -t "$DOCKER_IMAGE_TAG" . && docker push "$DOCKER_IMAGE_TAG"
-exit
+# Note: version is fetched from `mylife-home-core/pkg/version/value.go`
+make docker-publish
 ```
 
 ### Investigate last crash
