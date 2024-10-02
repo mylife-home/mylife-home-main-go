@@ -160,7 +160,6 @@ func (component *RollerShutter) refreshOnline() {
 	component.Online.Set(online)
 
 	if !online {
-		component.Value.Set(0)
 		component.Exec.Set(false)
 	}
 }
