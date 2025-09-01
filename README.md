@@ -1,6 +1,6 @@
 # mylife-home-core-go
 
-MyLife Home Core, Golang implementation
+MyLife Home Main, Golang implementation
 
 ## Bump
 
