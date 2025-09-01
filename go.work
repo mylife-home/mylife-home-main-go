@@ -3,18 +3,18 @@ go 1.22.3
 toolchain go1.22.4
 
 use (
-	./mylife-home-common
-	./mylife-home-core
-	./mylife-home-core-generator
-	./mylife-home-core-library
-	./mylife-home-core-plugins/driver-absoluta
-	./mylife-home-core-plugins/driver-klf200
-	./mylife-home-core-plugins/driver-notifications
-	./mylife-home-core-plugins/driver-tahoma
-	./mylife-home-core-plugins/logic-base
-	./mylife-home-core-plugins/logic-clim
-	./mylife-home-core-plugins/logic-colors
-	./mylife-home-core-plugins/logic-selectors
-	./mylife-home-core-plugins/logic-timers
-	./mylife-home-core-plugins/ui-base
+	./common/mylife-home-common
+	./core/mylife-home-core
+	./core/mylife-home-core-generator
+	./core/mylife-home-core-library
+	./core/plugins/driver-absoluta
+	./core/plugins/driver-klf200
+	./core/plugins/driver-notifications
+	./core/plugins/driver-tahoma
+	./core/plugins/logic-base
+	./core/plugins/logic-clim
+	./core/plugins/logic-colors
+	./core/plugins/logic-selectors
+	./core/plugins/logic-timers
+	./core/plugins/ui-base
 )
