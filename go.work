@@ -17,4 +17,5 @@ use (
 	./core/plugins/logic-selectors
 	./core/plugins/logic-timers
 	./core/plugins/ui-base
+	./ui/mylife-home-ui
 )
