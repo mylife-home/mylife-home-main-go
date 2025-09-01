@@ -4,70 +4,12 @@ MyLife Home Core, Golang implementation
 
 ## Bump
 
-- common: `mylife-home-common/version/value.go`
-- core: `mylife-home-core/pkg/version/value.go`
-- plugins: `mylife-home-core-plugins/*/main.go`
-- [release github](https://github.com/mylife-home/mylife-home-core-go/releases)
+- common: `common/mylife-home-common/version/value.go`
+- core:
+  - main: `core/mylife-home-core/pkg/version/value.go`
+  - plugins: `core/plugins/*/main.go`
+  - [github release (match core, only for rpi-alpine-build)](https://github.com/mylife-home/mylife-home-core-go/releases)
 
-## New plugin
+## Components
 
-- new folder in `mylife-home-core-plugins/`
-- Add `Generate` doc below
-- Add generate in `Dockerfile`
-- Add plugin in `mylife-home-core/main.go`
-- Add plugin in `rpi-alpine-build APKBUILD`
-
-## Generate
-
-```shell
-go generate mylife-home-core-plugins/driver-absoluta/main.go
-go generate mylife-home-core-plugins/driver-klf200/main.go
-go generate mylife-home-core-plugins/driver-notifications/main.go
-go generate mylife-home-core-plugins/driver-tahoma/main.go
-go generate mylife-home-core-plugins/logic-base/main.go
-go generate mylife-home-core-plugins/logic-clim/main.go
-go generate mylife-home-core-plugins/logic-colors/main.go
-go generate mylife-home-core-plugins/logic-selectors/main.go
-go generate mylife-home-core-plugins/logic-timers/main.go
-go generate mylife-home-core-plugins/ui-base/main.go
-```
-
-## Run
-
-```shell
-make run
-```
-
-## Docker
-
-### publish
-
-```shell
-# Note: version is fetched from `mylife-home-core/pkg/version/value.go`
-make docker-publish
-```
-
-### Investigate last crash
-
-```bash
-kubectl logs -n mylife-home pod-xxx -p
-```
-
-## Alpine - Raspberry PI
-
-- publish using rpi-alpine-build
-- test on rpi:
-
-```bash
-rc-service mylife-home-core stop
-
-apk del mylife-home-core mylife-home-core-plugins-logic-selectors mylife-home-core-plugins-logic-colors mylife-home-core-plugins-logic-timers mylife-home-core-plugins-logic-base mylife-home-core-plugins-ui-base mylife-home-core-plugins-driver-mpd mylife-home-core-plugins-driver-absoluta mylife-home-core-plugins-logic-clim mylife-home-core-plugins-driver-tahoma mylife-home-core-plugins-driver-broadlink
-
-apk add mylife-home-core-go
-
-vi /etc/mylife-home/config.yaml
-  your-should-override-this => localhost
-  supportsBindings => true
-
-rc-service mylife-home-core start
-```
+- [Core](core/README.md)

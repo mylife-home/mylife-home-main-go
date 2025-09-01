@@ -19,3 +19,5 @@
 
 # Generated code
 *generated.go
+
+bin/

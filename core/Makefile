@@ -4,7 +4,27 @@ DOCKER_PACKAGE_VERSION ?= $(shell go run mylife-home-core/build/print_version.go
 DOCKER_IMAGE_TAG ?= $(DOCKER_REPOSITORY)/$(DOCKER_PACKAGE_NAME):$(DOCKER_PACKAGE_VERSION)
 DOCKER_IMAGE_LATEST_TAG ?= $(DOCKER_REPOSITORY)/$(DOCKER_PACKAGE_NAME):latest
 
-.PHONY: docker-publish docker-build run
+OUTPUT_BINARY ?= bin/mylife-home-core
+
+.PHONY: docker-publish docker-build run prepare generate build
+
+prepare:
+	go mod download
+
+generate:
+	@echo "Generating code for all plugins..."
+	@for dir in plugins/*; do \
+		if [ -d "$$dir" ]; then \
+			echo "  - $$dir"; \
+			go generate "$$dir/main.go"; \
+		fi \
+	done
+
+build: prepare generate
+	mkdir -p $(dir $(OUTPUT_BINARY))
+	CGO_ENABLED=0 go build -o $(OUTPUT_BINARY) mylife-home-core/main.go
+	# go vet -v
+	# go test -v
 
 docker-publish: docker-build
 	docker push "$(DOCKER_IMAGE_TAG)"
