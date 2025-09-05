@@ -1,5 +1,5 @@
 import { createReducer, PayloadAction } from '@reduxjs/toolkit';
-import { Reset, ComponentAdd, ComponentRemove, StateChange } from '../../../../shared/registry';
+import { Reset, ComponentAdd, ComponentRemove, StateChange } from '../../server-api/registry';
 import { REGISTRY_RESET, REGISTRY_COMPONENT_ADD, REGISTRY_COMPONENT_REMOVE, REGISTRY_ATTRIBUTE_CHANGE, RepositoryState } from '../types/registry';
 
 const DEFAULT: RepositoryState = {};

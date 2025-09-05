@@ -1,5 +1,5 @@
 import { applyMiddleware, createStore } from 'redux';
-import thunk from 'redux-thunk';
+import { thunk } from 'redux-thunk';
 
 import { socketMiddleware } from './middlewares/socket';
 import { cssMiddleware } from './middlewares/css';

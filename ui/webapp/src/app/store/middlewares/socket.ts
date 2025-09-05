@@ -1,8 +1,8 @@
 import { Middleware } from 'redux';
 import { PayloadAction } from '@reduxjs/toolkit';
 import ReconnectingWebSocket from 'reconnecting-websocket';
-import { ActionComponent } from '../../../../shared/model';
-import { SocketMessage } from '../../../../shared/socket';
+import { ActionComponent } from '../../server-api/model';
+import { SocketMessage } from '../../server-api/socket';
 import { ACTION_COMPONENT } from '../types/actions';
 import { onlineSet } from '../actions/online';
 import { reset, componentAdd, componentRemove, attributeChange } from '../actions/registry';
