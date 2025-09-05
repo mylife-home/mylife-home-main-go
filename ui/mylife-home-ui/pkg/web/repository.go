@@ -5,7 +5,6 @@ import (
 	"net/http"
 )
 
-// setupRoutes configures the API routes
 func (ws *WebServer) setupRepository(mux *http.ServeMux) {
 	mux.HandleFunc("/repository/components", ws.handleGetComponents)
 	mux.HandleFunc("/repository/action/", ws.handleExecuteAction)
@@ -30,7 +29,6 @@ func (ws *WebServer) handleGetComponents(w http.ResponseWriter, r *http.Request)
 	fmt.Fprintf(w, `{"components": %v}`, componentIds)
 }
 
-// handleExecuteAction handles component action execution
 func (ws *WebServer) handleExecuteAction(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

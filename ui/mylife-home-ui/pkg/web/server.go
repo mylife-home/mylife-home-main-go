@@ -31,7 +31,6 @@ type WebServer struct {
 	config   webConfig
 }
 
-// NewWebServer creates a new web server instance
 func NewWebServer(registry components.Registry) *WebServer {
 	conf := webConfig{}
 	config.BindStructure("web", &conf)
@@ -65,7 +64,7 @@ func (ws *WebServer) start() error {
 
 	go func() {
 		if err := ws.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Errorf("Web server failed to start: %v", err)
+			logger.Errorf("Web server failed to run: %v", err)
 		}
 	}()
 
