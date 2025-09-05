@@ -19,13 +19,15 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: '../dist',
+    outDir: 'dist',
     emptyOutDir: true,
+/*
     rollupOptions: {
       // Seems side effects are dropped else
       // on Money changes size from 3.4Mb to 3.7Mb
       treeshake: false
     }
+*/
   },
   plugins: [preact()],
 });
