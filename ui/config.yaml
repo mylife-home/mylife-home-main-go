@@ -1,0 +1,4 @@
+bus:
+  serverUrl: tcp://rpi-dev-home-main:1883
+web:
+  port: 8001

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"mylife-home-ui/pkg/manager"
+	"mylife-home-ui/pkg/version"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,7 +13,6 @@ import (
 	"mylife-home-common/defines"
 	"mylife-home-common/instance_info"
 	"mylife-home-common/log"
-	"mylife-home-common/version"
 )
 
 var logger = log.CreateLogger("mylife:home:ui:main")
@@ -31,13 +32,13 @@ func run(_ *cobra.Command, _ []string) {
 	defines.Init("ui", version.Value)
 	instance_info.Init()
 
-	// m := manager.MakeManager()
+	m := manager.MakeManager()
 
 	channel := make(chan os.Signal, 1)
 	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)
 	<-channel
 
-	// m.Terminate()
+	m.Terminate()
 }
 
 func init() {

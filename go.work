@@ -1,6 +1,6 @@
-go 1.22.3
+go 1.24.2
 
-toolchain go1.22.4
+toolchain go1.24.6
 
 use (
 	./common/mylife-home-common
@@ -18,4 +18,5 @@ use (
 	./core/plugins/logic-timers
 	./core/plugins/ui-base
 	./ui/mylife-home-ui
+	./ui/webapp
 )
