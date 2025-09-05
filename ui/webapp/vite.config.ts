@@ -1,12 +1,13 @@
 import { defineConfig, loadEnv, UserConfigExport } from 'vite';
 import preact from '@preact/preset-vite';
+import { viteSingleFile } from 'vite-plugin-singlefile';
 
 const VITE_WEB_PORT = 8001;
 const VITE_WSTARGET_PORT = 8101;
 
 export default defineConfig({
   root: 'src',
-  publicDir: 'images',
+  publicDir: '../static',
   server: {
     host: true,
     port: VITE_WEB_PORT,
@@ -19,8 +20,14 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist',
+    outDir: '../dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Put assets directly in root, not in assets folder
+        assetFileNames: '[name].[ext]',
+      }
+    },
 /*
     rollupOptions: {
       // Seems side effects are dropped else
@@ -29,5 +36,9 @@ export default defineConfig({
     }
 */
   },
-  plugins: [preact()],
+  plugins: [preact(), viteSingleFile({
+    useRecommendedBuildConfig: false,
+    removeViteModuleLoader: true,
+    inlinePattern: ['**/*.js', '**/*.css'], // Only inline JS and CSS
+  })],
 });

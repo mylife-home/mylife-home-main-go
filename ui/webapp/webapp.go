@@ -5,7 +5,7 @@ import (
 	"io/fs"
 )
 
-//go:embed all:dist/prod/static
+//go:embed all:dist
 var build embed.FS
 
 var FS fs.FS
