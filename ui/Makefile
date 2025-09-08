@@ -10,8 +10,11 @@ OUTPUT_BINARY ?= bin/mylife-home-ui
 
 prepare:
 	go mod download
+	cd webapp && npm install
+
 
 build: prepare
+	cd webapp && npm run build
 	mkdir -p $(dir $(OUTPUT_BINARY))
 	CGO_ENABLED=0 go build -o $(OUTPUT_BINARY) mylife-home-ui/main.go
 	# go vet -v
@@ -23,6 +26,9 @@ docker-publish: docker-build
 
 docker-build:
 	docker build --pull -t "$(DOCKER_IMAGE_TAG)" -t "$(DOCKER_IMAGE_LATEST_TAG)" -f Dockerfile ..
+
+run-ui:
+	cd webapp && npm run dev
 
 run:
 	go run mylife-home-ui/main.go --log-console

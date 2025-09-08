@@ -1,20 +1,18 @@
-import { defineConfig, loadEnv, UserConfigExport } from 'vite';
+import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
-
-const VITE_WEB_PORT = 8001;
-const VITE_WSTARGET_PORT = 8101;
 
 export default defineConfig({
   root: 'src',
   publicDir: '../static',
   server: {
+    allowedHosts: true,
     host: true,
-    port: VITE_WEB_PORT,
+    port: 8101,
     strictPort: true,
     proxy: {
       '/socket.io': {
-        target: `ws://localhost:${VITE_WSTARGET_PORT}`,
+        target: `ws://localhost:8001`,
         ws: true,
       },
     }
