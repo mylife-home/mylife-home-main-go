@@ -1,12 +1,13 @@
 import { createReducer, PayloadAction } from '@reduxjs/toolkit';
-import { VIEW_POPUP, VIEW_CLOSE, VIEW_CHANGE } from '../types/view';
+import { viewPopup, internalViewClose, internalViewChange } from '../actions/view';
 
 const DEFAULT: string[] = [];
 
-export default createReducer(DEFAULT, {
-  [VIEW_POPUP]: (state, action: PayloadAction<string>) => [...state, action.payload],
-  [VIEW_CLOSE]: (state, action) => pop(state),
-  [VIEW_CHANGE]: (state, action: PayloadAction<string>) => [action.payload],
+export default createReducer(DEFAULT, (builder) => {
+  builder
+  .addCase(viewPopup, (state, action: PayloadAction<string>) => [...state, action.payload])
+  .addCase(internalViewClose, (state, action) => pop(state))
+  .addCase(internalViewChange, (state, action: PayloadAction<string>) => [action.payload])
 });
 
 function pop<T>(array: T[]): T[] {

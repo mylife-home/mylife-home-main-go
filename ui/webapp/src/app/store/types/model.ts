@@ -1,7 +1,5 @@
 import { Window, DefaultWindow, Control } from '../../server-api/model';
-export { Model as NetModel, Window, Control, ControlDisplay, ControlDisplayMapItem, ControlText, ControlTextContextItem, Action, ActionComponent, ActionWindow, Resource } from '../../server-api/model';
-
-export const MODEL_SET = 'model/set';
+export type { Model as NetModel, Window, Control, ControlDisplay, ControlDisplayMapItem, ControlText, ControlTextContextItem, Action, ActionComponent, ActionWindow, Resource } from '../../server-api/model';
 
 export interface Model {
   defaultWindow: DefaultWindow;

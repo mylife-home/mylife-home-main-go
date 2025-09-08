@@ -1,11 +1,10 @@
 import { createAction } from '@reduxjs/toolkit';
 import { AppThunkAction } from '../types';
 import { CSS_SET } from '../types/css';
-import { MODEL_SET, NetModel } from '../types/model';
 import { resourceQuery } from './resources';
 import { viewInit } from './view';
 
-const modelSet = createAction<NetModel>(MODEL_SET);
+export const modelSet = createAction<NetModel>('model/set');
 const cssSet = createAction<string>(CSS_SET);
 
 export const modelInit = (modelHash: string): AppThunkAction => (dispatch, getState) => {

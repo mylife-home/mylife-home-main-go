@@ -1,20 +1,22 @@
 import { createReducer, PayloadAction } from '@reduxjs/toolkit';
 import { Reset, ComponentAdd, ComponentRemove, StateChange } from '../../server-api/registry';
-import { REGISTRY_RESET, REGISTRY_COMPONENT_ADD, REGISTRY_COMPONENT_REMOVE, REGISTRY_ATTRIBUTE_CHANGE, RepositoryState } from '../types/registry';
+import { RepositoryState } from '../types/registry';
+import { reset, componentAdd, componentRemove, attributeChange} from '../actions/registry';
 
 const DEFAULT: RepositoryState = {};
 
-export default createReducer(DEFAULT, {
-  [REGISTRY_RESET]: (state, action: PayloadAction<Reset>) => action.payload,
-  [REGISTRY_COMPONENT_ADD]: (state, action: PayloadAction<ComponentAdd>) => ({ ...state, [action.payload.id]: action.payload.attributes }),
-  [REGISTRY_COMPONENT_REMOVE]: (state, action: PayloadAction<ComponentRemove>) => deleteObjectKey(state, action.payload.id),
-  [REGISTRY_ATTRIBUTE_CHANGE]: (state, action: PayloadAction<StateChange>) => ({
+export default createReducer(DEFAULT, (builder) => {
+  builder
+  .addCase(reset, (state, action: PayloadAction<Reset>) => action.payload)
+  .addCase(componentAdd, (state, action: PayloadAction<ComponentAdd>) => ({ ...state, [action.payload.id]: action.payload.attributes }))
+  .addCase(componentRemove, (state, action: PayloadAction<ComponentRemove>) => deleteObjectKey(state, action.payload.id))
+  .addCase(attributeChange, (state, action: PayloadAction<StateChange>) => ({
     ...state,
     [action.payload.id]: {
       ...state[action.payload.id],
       [action.payload.name]: action.payload.value
     }
-  }),
+  }));
 });
 
 function deleteObjectKey<T>(obj: {[id: string]: T}, key: string) :  {[id: string]: T} {

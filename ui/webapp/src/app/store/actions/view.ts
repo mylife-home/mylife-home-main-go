@@ -1,14 +1,13 @@
 import { createAction } from '@reduxjs/toolkit';
 import { AppThunkAction } from '../types';
-import { VIEW_POPUP, VIEW_CLOSE, VIEW_CHANGE } from '../types/view';
 import { getView, hasView, isViewPopup } from '../selectors/view';
 import { hasWindow, getDefaultWindowId } from '../selectors/model';
 import { isMobile } from '../../utils/detect-browser';
 import { navigate } from './navigation';
 
-const internalViewClose = createAction(VIEW_CLOSE);
-export const viewPopup = createAction<string>(VIEW_POPUP);
-const internalViewChange = createAction<string>(VIEW_CHANGE);
+export const internalViewClose = createAction('view/close');
+export const viewPopup = createAction<string>('view/popup');
+export const internalViewChange = createAction<string>('view/change');
 
 const navigateToDefault = (): AppThunkAction => (dispatch, getState) => {
   const state = getState();
