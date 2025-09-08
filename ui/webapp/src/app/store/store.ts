@@ -10,7 +10,7 @@ import reducer from './reducers/index';
 
 const middlewares = [navigationMiddleware, socketMiddleware, resourcesMiddleware, cssMiddleware, thunk];
 
-if (process.env.NODE_ENV !== 'production') {
+if (import.meta.env.MODE !== 'production') {
   middlewares.push(createLogger());
 }
 
