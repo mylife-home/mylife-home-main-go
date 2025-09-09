@@ -11,9 +11,12 @@ OUTPUT_BINARY ?= bin/mylife-home-ui
 prepare:
 	go mod download
 	cd webapp && npm install
+	go install github.com/gzuidhof/tygo@latest
 
+generate:
+	go run mylife-home-ui/build/gen_api.go
 
-build: prepare
+build: generate
 	cd webapp && npm run build
 	mkdir -p $(dir $(OUTPUT_BINARY))
 	CGO_ENABLED=0 go build -o $(OUTPUT_BINARY) mylife-home-ui/main.go
@@ -27,7 +30,7 @@ docker-publish: docker-build
 docker-build:
 	docker build --pull -t "$(DOCKER_IMAGE_TAG)" -t "$(DOCKER_IMAGE_LATEST_TAG)" -f Dockerfile ..
 
-run-ui:
+run-ui: generate
 	cd webapp && npm run dev
 
 run:
