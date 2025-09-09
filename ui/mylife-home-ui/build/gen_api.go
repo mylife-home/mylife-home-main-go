@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/gzuidhof/tygo/tygo"
@@ -14,40 +12,39 @@ const inputPath = "mylife-home-ui/pkg/web/api"
 const outputPath = "webapp/src/app/api"
 
 func main() {
-	// List files to generate
-	files, err := listGoFiles(inputPath)
+	files, err := listFiles(inputPath)
 	if err != nil {
-		fmt.Printf("Error listing files: %v\n", err)
-		os.Exit(1)
+		panic(err)
 	}
 
-	fmt.Printf("Found %d .go files in %s:\n", len(files), inputPath)
 	for _, file := range files {
-		fmt.Printf("  %s\n", file)
+		outputFile := strings.TrimSuffix(file, ".go") + ".gen.ts"
+		println("Generating", outputFile)
+
+		err := generate(file, outputFile)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
-func listGoFiles(dirPath string) ([]string, error) {
-	var goFiles []string
+func listFiles(dirPath string) ([]string, error) {
+	var files []string
 
-	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	// Read directory contents (only root level, no subdirectories)
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		// Only process files (not directories) that end with .go
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") {
+			files = append(files, entry.Name())
 		}
+	}
 
-		if !info.IsDir() && strings.HasSuffix(path, ".go") {
-			// Convert to relative path from the input directory
-			relPath, err := filepath.Rel(dirPath, path)
-			if err != nil {
-				return err
-			}
-			goFiles = append(goFiles, relPath)
-		}
-
-		return nil
-	})
-
-	return goFiles, err
+	return files, nil
 }
 
 func generate(inputFile, outputFile string) error {
@@ -65,5 +62,4 @@ func generate(inputFile, outputFile string) error {
 
 	gen := tygo.New(config)
 	return gen.Generate()
-
 }

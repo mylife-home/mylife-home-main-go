@@ -12,63 +12,63 @@ type Model struct {
 type DefaultWindow = map[string]string
 
 type Window struct {
-	ID                 string    `json:"id" tsype:",readonly"`
-	Style              Style     `json:"style" tsype:",readonly"`
-	Height             int       `json:"height" tsype:",readonly"`
-	Width              int       `json:"width" tsype:",readonly"`
-	BackgroundResource Resource  `json:"backgroundResource" tsype:",readonly"`
-	Controls           []Control `json:"controls" tsype:",readonly"`
+	ID                 string    `json:"id" tstype:",readonly"`
+	Style              Style     `json:"style" tstype:",readonly"`
+	Height             int       `json:"height" tstype:",readonly"`
+	Width              int       `json:"width" tstype:",readonly"`
+	BackgroundResource Resource  `json:"backgroundResource" tstype:",readonly"`
+	Controls           []Control `json:"controls" tstype:",readonly"`
 }
 
 type Control struct {
-	ID              string         `json:"id" tsype:",readonly"`
-	Style           Style          `json:"style" tsype:",readonly"`
-	Height          int            `json:"height" tsype:",readonly"`
-	Width           int            `json:"width" tsype:",readonly"`
-	X               int            `json:"x" tsype:",readonly"`
-	Y               int            `json:"y" tsype:",readonly"`
-	Display         ControlDisplay `json:"display" tsype:",readonly"`
-	Text            ControlText    `json:"text" tsype:",readonly"`
-	PrimaryAction   Action         `json:"primaryAction" tsype:",readonly"`
-	SecondaryAction Action         `json:"secondaryAction" tsype:",readonly"`
+	ID              string         `json:"id" tstype:",readonly"`
+	Style           Style          `json:"style" tstype:",readonly"`
+	Height          int            `json:"height" tstype:",readonly"`
+	Width           int            `json:"width" tstype:",readonly"`
+	X               int            `json:"x" tstype:",readonly"`
+	Y               int            `json:"y" tstype:",readonly"`
+	Display         ControlDisplay `json:"display" tstype:",readonly"`
+	Text            ControlText    `json:"text" tstype:",readonly"`
+	PrimaryAction   Action         `json:"primaryAction" tstype:",readonly"`
+	SecondaryAction Action         `json:"secondaryAction" tstype:",readonly"`
 }
 
 type ControlDisplay struct {
-	ComponentID     string                  `json:"componentId" tsype:",readonly"`
-	ComponentState  string                  `json:"componentState" tsype:",readonly"`
-	DefaultResource Resource                `json:"defaultResource" tsype:",readonly"`
-	Map             []ControlDisplayMapItem `json:"map" tsype:",readonly"`
+	ComponentID     string                  `json:"componentId" tstype:",readonly"`
+	ComponentState  string                  `json:"componentState" tstype:",readonly"`
+	DefaultResource Resource                `json:"defaultResource" tstype:",readonly"`
+	Map             []ControlDisplayMapItem `json:"map" tstype:",readonly"`
 }
 
 type ControlDisplayMapItem struct {
-	Min      int      `json:"min" tsype:",readonly"`
-	Max      int      `json:"max" tsype:",readonly"`
-	Value    any      `json:"value" tsype:"string | boolean,readonly"` // or others ?
-	Resource Resource `json:"resource" tsype:",readonly"`
+	Min      int      `json:"min" tstype:",readonly"`
+	Max      int      `json:"max" tstype:",readonly"`
+	Value    any      `json:"value" tstype:"string | boolean,readonly"` // or others ?
+	Resource Resource `json:"resource" tstype:",readonly"`
 }
 
 type ControlText struct {
-	Context []ControlTextContextItem `json:"context" tsype:",readonly"`
-	Format  string                   `json:"format" tsype:",readonly"`
+	Context []ControlTextContextItem `json:"context" tstype:",readonly"`
+	Format  string                   `json:"format" tstype:",readonly"`
 }
 
 type ControlTextContextItem struct {
-	ID             string `json:"id" tsype:",readonly"`
-	ComponentID    string `json:"componentId" tsype:",readonly"`
-	ComponentState string `json:"componentState" tsype:",readonly"`
+	ID             string `json:"id" tstype:",readonly"`
+	ComponentID    string `json:"componentId" tstype:",readonly"`
+	ComponentState string `json:"componentState" tstype:",readonly"`
 }
 
 type Action struct {
-	Component ActionComponent `json:"component" tsype:",readonly"`
-	Window    ActionWindow    `json:"window" tsype:",readonly"`
+	Component ActionComponent `json:"component" tstype:",readonly"`
+	Window    ActionWindow    `json:"window" tstype:",readonly"`
 }
 
 type ActionComponent struct {
-	ID     string `json:"id" tsype:",readonly"`
-	Action string `json:"action" tsype:",readonly"`
+	ID     string `json:"id" tstype:",readonly"`
+	Action string `json:"action" tstype:",readonly"`
 }
 
 type ActionWindow struct {
-	ID    string `json:"id" tsype:",readonly"`
-	Popup bool   `json:"popup" tsype:",readonly"`
+	ID    string `json:"id" tstype:",readonly"`
+	Popup bool   `json:"popup" tstype:",readonly"`
 }
