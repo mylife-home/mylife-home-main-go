@@ -21,3 +21,5 @@
 *generated.go
 
 bin/
+
+store.json
