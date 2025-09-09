@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import { Reset, ComponentAdd, ComponentRemove, StateChange } from '../../server-api/registry';
+import { Reset, ComponentAdd, ComponentRemove, StateChange } from '../../api/registry';
 
 export const reset = createAction<Reset>('registry/reset');
 export const componentAdd = createAction<ComponentAdd>('registry/component-add');

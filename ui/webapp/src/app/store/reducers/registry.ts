@@ -1,5 +1,5 @@
 import { createReducer, PayloadAction } from '@reduxjs/toolkit';
-import { Reset, ComponentAdd, ComponentRemove, StateChange } from '../../server-api/registry';
+import { Reset, ComponentAdd, ComponentRemove, StateChange } from '../../api/registry';
 import { RepositoryState } from '../types/registry';
 import { reset, componentAdd, componentRemove, attributeChange} from '../actions/registry';
 

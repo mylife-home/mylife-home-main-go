@@ -18,7 +18,7 @@ func main() {
 	}
 
 	for _, file := range files {
-		outputFile := strings.TrimSuffix(file, ".go") + ".gen.ts"
+		outputFile := strings.TrimSuffix(file, ".go") + ".ts"
 		println("Generating", outputFile)
 
 		err := generate(file, outputFile)
