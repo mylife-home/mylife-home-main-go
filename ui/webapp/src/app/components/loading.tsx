@@ -3,7 +3,7 @@ import Overlay from './overlay';
 
 const Loading: FunctionComponent = () => (
   <Overlay>
-    <img src='images/loading.svg' className='mylife-img-loading' />
+    <img src='/loading.svg' className='mylife-img-loading' />
   </Overlay>
 );
 

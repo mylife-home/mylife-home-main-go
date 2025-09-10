@@ -3,6 +3,7 @@ module mylife-home-ui
 go 1.24.2
 
 require (
+	github.com/coder/websocket v1.8.14 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
 	github.com/gzuidhof/tygo v0.2.19 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

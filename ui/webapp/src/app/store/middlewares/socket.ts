@@ -11,7 +11,8 @@ import { modelInit } from '../actions/model';
 class WebSocket extends ReconnectingWebSocket { }
 
 export const socketMiddleware: Middleware = (store) => (next) => {
-  const socket = new WebSocket(location.origin.replace(/^http/, 'ws'));
+  const url = location.origin.replace(/^http/, 'ws') + '/ws';
+  const socket = new WebSocket(url);
 
   socket.onopen = () => next(onlineSet(true));
   socket.onclose = () => next(onlineSet(false));
