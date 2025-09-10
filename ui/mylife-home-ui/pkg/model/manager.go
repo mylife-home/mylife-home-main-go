@@ -81,7 +81,7 @@ func (mm *ModelManager) load() {
 	if err != nil {
 		if os.IsNotExist(err) {
 			logger.Info("Using default empty model")
-			mm.setDefinition(mm.buildDefaultDefinition())
+			mm.SetDefinition(mm.buildDefaultDefinition())
 			return
 		}
 
@@ -95,7 +95,7 @@ func (mm *ModelManager) load() {
 		panic(err)
 	}
 
-	if err := mm.setDefinition(&definition); err != nil {
+	if err := mm.SetDefinition(&definition); err != nil {
 		panic(err)
 	}
 }
@@ -137,7 +137,7 @@ func (mm *ModelManager) buildDefaultDefinition() *Definition {
 	}
 }
 
-func (mm *ModelManager) setDefinition(definition *Definition) error {
+func (mm *ModelManager) SetDefinition(definition *Definition) error {
 	builder := newBuilder()
 
 	if err := builder.BuildModel(definition); err != nil {
