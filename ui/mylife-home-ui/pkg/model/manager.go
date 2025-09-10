@@ -8,6 +8,7 @@ import (
 
 	"mylife-home-common/config"
 	"mylife-home-common/log"
+	"mylife-home-common/tools"
 )
 
 var logger = log.CreateLogger("mylife:home:ui:model")
@@ -27,7 +28,7 @@ type RequiredComponentState struct {
 }
 
 type ModelManager struct {
-	modelHash               string
+	modelHash               tools.SubjectValue[string]
 	resources               map[string]*Resource
 	requiredComponentStates []RequiredComponentState
 	config                  modelConfig
@@ -38,6 +39,7 @@ func NewModelManager() *ModelManager {
 	config.BindStructure("model", &conf)
 
 	mm := &ModelManager{
+		modelHash:               tools.MakeSubjectValue[string](""),
 		resources:               make(map[string]*Resource),
 		requiredComponentStates: []RequiredComponentState{},
 		config:                  conf,
@@ -48,7 +50,7 @@ func NewModelManager() *ModelManager {
 	return mm
 }
 
-func (mm *ModelManager) GetModelHash() string {
+func (mm *ModelManager) ModelHash() tools.ObservableValue[string] {
 	return mm.modelHash
 }
 
@@ -134,13 +136,11 @@ func (mm *ModelManager) setDefinition(definition *Definition) error {
 		return fmt.Errorf("failed to build model: %w", err)
 	}
 
-	mm.modelHash = builder.ModelHash
-	mm.resources = builder.Resources
 	mm.extractRequiredComponentStates(builder.Model)
+	mm.resources = builder.Resources
+	mm.modelHash.Update(builder.ModelHash)
 
 	logger.Infof("Updated model : %s", mm.modelHash)
-	// TODO
-	//this.emit('update');
 
 	logger.Infof("Save model to store: '%s'", mm.config.StorePath)
 	content, err := json.Marshal(definition)
