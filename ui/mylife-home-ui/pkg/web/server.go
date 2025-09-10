@@ -12,12 +12,6 @@ import (
 	"mylife-home-common/log"
 )
 
-/*
-
-Use nhooyr.io/websocket for WS.
-
-*/
-
 var logger = log.CreateLogger("mylife:home:ui:web")
 
 type webConfig struct {
@@ -54,6 +48,7 @@ func (ws *WebServer) start() error {
 
 	ws.setupRepository(mux)
 	ws.setupResources(mux)
+	ws.setupSessions(mux)
 	ws.setupStatic(mux)
 
 	ws.server = &http.Server{
