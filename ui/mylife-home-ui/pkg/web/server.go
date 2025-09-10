@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"mylife-home-ui/pkg/model"
 	"net/http"
 	"time"
 
@@ -13,8 +14,6 @@ import (
 
 /*
 
-Use net/http for routes.
-Use embed for static UI.
 Use nhooyr.io/websocket for WS.
 
 */
@@ -28,15 +27,17 @@ type webConfig struct {
 type WebServer struct {
 	server   *http.Server
 	registry components.Registry
+	model    *model.ModelManager
 	config   webConfig
 }
 
-func NewWebServer(registry components.Registry) *WebServer {
+func NewWebServer(registry components.Registry, model *model.ModelManager) *WebServer {
 	conf := webConfig{}
 	config.BindStructure("web", &conf)
 
 	ws := &WebServer{
 		registry: registry,
+		model:    model,
 		config:   conf,
 	}
 
