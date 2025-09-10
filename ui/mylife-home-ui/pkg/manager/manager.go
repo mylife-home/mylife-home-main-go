@@ -14,16 +14,17 @@ type Manager struct {
 	transport *bus.Transport
 	registry  components.Registry
 	model     *model.ModelManager
+	listener  components.BusListener
 	webServer *web.WebServer
 }
 
 func MakeManager() *Manager {
 	manager := &Manager{}
 
-	// static?
 	manager.transport = bus.NewTransport()
 	manager.registry = components.NewRegistry()
 	manager.model = model.NewModelManager()
+	manager.listener = components.ListenBus(manager.transport, manager.registry)
 	manager.webServer = web.NewWebServer(manager.registry, manager.model)
 
 	return manager
@@ -31,5 +32,6 @@ func MakeManager() *Manager {
 
 func (manager *Manager) Terminate() {
 	manager.webServer.Terminate()
+	manager.listener.Terminate()
 	manager.transport.Terminate()
 }
