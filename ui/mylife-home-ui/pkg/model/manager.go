@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mylife-home-ui/pkg/web/api"
 	"os"
+	"sync"
 
 	"mylife-home-common/config"
 	"mylife-home-common/log"
@@ -28,10 +29,12 @@ type RequiredComponentState struct {
 }
 
 type ModelManager struct {
-	modelHash               tools.SubjectValue[string]
+	modelHash               string
 	resources               map[string]*Resource
 	requiredComponentStates []RequiredComponentState
 	config                  modelConfig
+	onUpdate                tools.Subject[struct{}]
+	updateMux               sync.Mutex
 }
 
 func NewModelManager() *ModelManager {
@@ -39,10 +42,10 @@ func NewModelManager() *ModelManager {
 	config.BindStructure("model", &conf)
 
 	mm := &ModelManager{
-		modelHash:               tools.MakeSubjectValue[string](""),
 		resources:               make(map[string]*Resource),
 		requiredComponentStates: []RequiredComponentState{},
 		config:                  conf,
+		onUpdate:                tools.MakeSubject[struct{}](),
 	}
 
 	mm.load()
@@ -50,18 +53,23 @@ func NewModelManager() *ModelManager {
 	return mm
 }
 
-func (mm *ModelManager) ModelHash() tools.ObservableValue[string] {
+func (mm *ModelManager) GetModelHash() string {
+	// Atomic read, no lock needed
 	return mm.modelHash
 }
 
 // Given without copy, do not modify
 func (mm *ModelManager) GetRequiredComponentStates() []RequiredComponentState {
+	// Atomic read, no lock needed (only replaced on update)
 	return mm.requiredComponentStates
 }
 
 // Given without copy, do not modify
 func (mm *ModelManager) GetResource(hash string) (*Resource, error) {
-	resource, exists := mm.resources[hash]
+	// Atomic read, no lock needed (only replaced on update)
+	resources := mm.resources
+
+	resource, exists := resources[hash]
 	if !exists {
 		return nil, fmt.Errorf("resource with hash '%s' does not exist", hash)
 	}
@@ -136,11 +144,15 @@ func (mm *ModelManager) setDefinition(definition *Definition) error {
 		return fmt.Errorf("failed to build model: %w", err)
 	}
 
-	mm.extractRequiredComponentStates(builder.Model)
+	mm.updateMux.Lock()
+	defer mm.updateMux.Unlock()
+
+	mm.modelHash = builder.ModelHash
 	mm.resources = builder.Resources
-	mm.modelHash.Update(builder.ModelHash)
+	mm.extractRequiredComponentStates(builder.Model)
 
 	logger.Infof("Updated model : %s", mm.modelHash)
+	mm.onUpdate.Notify(struct{}{})
 
 	logger.Infof("Save model to store: '%s'", mm.config.StorePath)
 	content, err := json.Marshal(definition)
