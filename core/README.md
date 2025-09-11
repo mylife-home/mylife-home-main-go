@@ -42,10 +42,6 @@ kubectl logs -n mylife-home pod-xxx -p
 - test on rpi:
 
 ```bash
-rc-service mylife-home-core stop
-
-apk del mylife-home-core mylife-home-core-plugins-logic-selectors mylife-home-core-plugins-logic-colors mylife-home-core-plugins-logic-timers mylife-home-core-plugins-logic-base mylife-home-core-plugins-ui-base mylife-home-core-plugins-driver-mpd mylife-home-core-plugins-driver-absoluta mylife-home-core-plugins-logic-clim mylife-home-core-plugins-driver-tahoma mylife-home-core-plugins-driver-broadlink
-
 apk add mylife-home-core-go
 
 vi /etc/mylife-home/config.yaml
@@ -54,3 +50,10 @@ vi /etc/mylife-home/config.yaml
 
 rc-service mylife-home-core start
 ```
+
+## TODO
+
+### async issues
+
+emit/dispatch async break the order of messages. eg emit true then false for an action may break the order and send false then true
+so we should have a MQTT send/receive queue, which keep order, and remove all async stuff in registry/bus_listener/bus_publisher after
