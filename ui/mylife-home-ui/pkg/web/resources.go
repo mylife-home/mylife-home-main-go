@@ -3,18 +3,15 @@ package web
 import "net/http"
 
 func (ws *WebServer) setupResources(mux *http.ServeMux) {
-	mux.HandleFunc("/resources/", ws.handleGetResource)
+	mux.HandleFunc("GET /resources/{hash}", ws.handleGetResource)
 }
 
 func (ws *WebServer) handleGetResource(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	hash := r.PathValue("hash")
+	if hash == "" {
+		http.Error(w, "Resource hash is required", http.StatusBadRequest)
 		return
 	}
-
-	// Extract resource hash from URL path
-	// URL format: /resources/{hash}
-	hash := r.URL.Path[len("/resources/"):]
 
 	resource, err := ws.model.GetResource(hash)
 	if err != nil {
