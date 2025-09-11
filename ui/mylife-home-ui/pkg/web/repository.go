@@ -89,7 +89,9 @@ func (ws *WebServer) handleExecuteAction(w http.ResponseWriter, r *http.Request)
 
 	action := comp.Action(actionName)
 	action <- true
-	time.Sleep(100 * time.Millisecond) // FIXME: Give some time for the action to be processed
+	// FIXME: Give some time for the action to be processed
+	// For now actions are emitted async, which may break the order
+	time.Sleep(100 * time.Millisecond)
 	action <- false
 
 	w.WriteHeader(http.StatusOK)
