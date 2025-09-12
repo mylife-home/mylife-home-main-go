@@ -22,3 +22,8 @@ type SocketMessage struct {
 	Type MessageType     `json:"type" tstype:"\"state\" | \"add\" | \"remove\" | \"change\" | \"modelHash\" | \"ping\" | \"pong\" | \"action\""`
 	Data json.RawMessage `json:"data"`
 }
+
+type ActionMessage struct {
+	Id     string `json:"id"`
+	Action string `json:"action"`
+}

@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"slices"
 	"sync"
+	"time"
 
+	"mylife-home-common/components"
+	"mylife-home-common/components/metadata"
 	"mylife-home-common/log"
 
 	"github.com/coder/websocket"
@@ -18,6 +21,7 @@ import (
 var logger = log.CreateLogger("mylife:home:ui:web:sessions")
 
 type Manager struct {
+	registry        components.Registry
 	model           *model.ModelManager
 	modelUpdateChan chan struct{}
 
@@ -26,8 +30,9 @@ type Manager struct {
 	sessionsIdGen int
 }
 
-func NewManager(model *model.ModelManager) *Manager {
+func NewManager(registry components.Registry, model *model.ModelManager) *Manager {
 	m := &Manager{
+		registry:        registry,
 		model:           model,
 		modelUpdateChan: make(chan struct{}),
 		sessions:        make(map[*session]struct{}),
@@ -136,6 +141,50 @@ func (m *Manager) processMessage(s *session, msg *api.SocketMessage) {
 	case api.MessagePing:
 		m.sendOne(s, api.MessagePong, nil)
 
-		// TODO
+	case api.MessageAction:
+		var actionMsg api.ActionMessage
+		err := json.Unmarshal(msg.Data, &actionMsg)
+		if err != nil {
+			logger.Errorf("Invalid action message: '%s': %v", string(msg.Data), err)
+			return
+		}
+
+		m.executeAction(actionMsg.Id, actionMsg.Action)
+
+	default:
+		logger.Errorf("Unknown message type: %s", msg.Type)
 	}
+}
+
+func (m *Manager) executeAction(componentId string, actionName string) {
+	comp := m.registry.GetComponent(componentId)
+	if comp == nil {
+		logger.Warnf("Component not found: %s", componentId)
+		return
+	}
+
+	plugin := comp.Plugin()
+	if plugin.Usage() != metadata.Ui {
+		logger.Warnf("Component is not a UI component: %s", componentId)
+		return
+	}
+
+	actionMember := plugin.Member(actionName)
+	if actionMember == nil || actionMember.MemberType() != metadata.Action {
+		logger.Warnf("Action not found: %s on component %s", actionName, componentId)
+		return
+	}
+
+	if !metadata.MakeTypeBool().Equals(actionMember.ValueType()) {
+		logger.Warnf("Action type must be boolean: %s on component %s", actionName, componentId)
+		return
+	}
+
+	action := comp.Action(actionName)
+
+	action <- true
+	// FIXME: Give some time for the action to be processed
+	// For now actions are emitted async, which may break the order
+	time.Sleep(100 * time.Millisecond)
+	action <- false
 }

@@ -31,7 +31,7 @@ func NewWebServer(registry components.Registry, model *model.ModelManager) *WebS
 	ws := &WebServer{
 		registry:       registry,
 		model:          model,
-		sessionManager: sessions.NewManager(model),
+		sessionManager: sessions.NewManager(registry, model),
 	}
 
 	config.BindStructure("web", &ws.config)

@@ -59,8 +59,8 @@ type ControlTextContextItem struct {
 }
 
 type Action struct {
-	Component ActionComponent `json:"component" tstype:",readonly"`
-	Window    ActionWindow    `json:"window" tstype:",readonly"`
+	Component *ActionComponent `json:"component" tstype:",readonly"`
+	Window    *ActionWindow    `json:"window" tstype:",readonly"`
 }
 
 type ActionComponent struct {

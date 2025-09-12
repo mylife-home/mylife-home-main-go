@@ -54,7 +54,9 @@ func (s *session) start() {
 func (s *session) readWorker() {
 	for {
 		var msg api.SocketMessage
+		fmt.Println("Reading message...")
 		err := wsjson.Read(s.ctx, s.conn, &msg)
+		fmt.Println("Read complete.")
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return
@@ -64,7 +66,7 @@ func (s *session) readWorker() {
 			continue
 		}
 
-		logger.Debugf("Received message on session %s: %+v", s.id, msg)
+		logger.Debugf("Received message on session %s: %s", s.id, msg.Type)
 
 		// Reset the timeout timer on each message received
 		s.timeout.Reset(idleTimeout)
@@ -81,7 +83,7 @@ func (s *session) writeWorker() {
 			continue
 		}
 
-		logger.Debugf("Sent message on session %s: %+v", s.id, msg)
+		logger.Debugf("Sent message on session %s: %s", s.id, msg.Type)
 	}
 }
 
@@ -104,6 +106,11 @@ func (s *session) error(err error) {
 }
 
 func (s *session) Terminate() {
+	if s.ctx.Err() != nil {
+		// Already terminated
+		return
+	}
+
 	logger.Debugf("Closing session: %s", s.id)
 
 	close(s.sendChan)
