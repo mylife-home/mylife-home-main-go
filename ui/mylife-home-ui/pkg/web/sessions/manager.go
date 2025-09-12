@@ -23,6 +23,7 @@ var logger = log.CreateLogger("mylife:home:ui:web:sessions")
 type Manager struct {
 	registry        components.Registry
 	model           *model.ModelManager
+	stateListener   *stateListener
 	modelUpdateChan chan struct{}
 
 	sessions      map[*session]struct{}
@@ -34,12 +35,12 @@ func NewManager(registry components.Registry, model *model.ModelManager) *Manage
 	m := &Manager{
 		registry:        registry,
 		model:           model,
+		stateListener:   newStateListener(registry),
 		modelUpdateChan: make(chan struct{}),
 		sessions:        make(map[*session]struct{}),
 	}
 
 	go m.modelUpdateWorker()
-
 	m.model.OnUpdate().Subscribe(m.modelUpdateChan)
 
 	return m
@@ -50,6 +51,8 @@ func (m *Manager) Terminate() {
 
 	m.model.OnUpdate().Unsubscribe(m.modelUpdateChan)
 	close(m.modelUpdateChan)
+
+	m.stateListener.Terminate()
 
 	// Obtain list then unlock to avoid deadlock in Terminate()
 	m.sessionsMux.Lock()
