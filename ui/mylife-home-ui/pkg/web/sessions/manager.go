@@ -21,10 +21,12 @@ import (
 var logger = log.CreateLogger("mylife:home:ui:web:sessions")
 
 type Manager struct {
-	registry        components.Registry
-	model           *model.ModelManager
-	stateListener   *stateListener
-	modelUpdateChan chan struct{}
+	registry                   components.Registry
+	model                      *model.ModelManager
+	stateListener              *stateListener
+	modelUpdateChan            chan struct{}
+	requiredComponentStates    map[string]map[string]struct{}
+	requiredComponentStatesMux sync.Mutex
 
 	sessions      map[*session]struct{}
 	sessionsMux   sync.Mutex
@@ -33,12 +35,15 @@ type Manager struct {
 
 func NewManager(registry components.Registry, model *model.ModelManager) *Manager {
 	m := &Manager{
-		registry:        registry,
-		model:           model,
-		stateListener:   newStateListener(registry),
-		modelUpdateChan: make(chan struct{}),
-		sessions:        make(map[*session]struct{}),
+		registry:                registry,
+		model:                   model,
+		modelUpdateChan:         make(chan struct{}),
+		requiredComponentStates: make(map[string]map[string]struct{}),
+		sessions:                make(map[*session]struct{}),
 	}
+
+	m.setRequiredComponentStates()
+	m.stateListener = newStateListener(registry, m.handleStateChange, m.handleComponentAdd, m.handleComponentRemove)
 
 	go m.modelUpdateWorker()
 	m.model.OnUpdate().Subscribe(m.modelUpdateChan)
@@ -93,6 +98,7 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	session.start()
 	m.sendOne(session, api.MessageModelHash, m.model.GetModelHash())
+	m.sendInitialComponentStates(session)
 }
 
 func (m *Manager) removeSession(s *session) {
@@ -106,6 +112,113 @@ func (m *Manager) modelUpdateWorker() {
 	for range m.modelUpdateChan {
 		modelHash := m.model.GetModelHash()
 		m.sendAll(api.MessageModelHash, modelHash)
+		m.setRequiredComponentStates()
+	}
+}
+
+func (m *Manager) handleStateChange(componentId string, stateName string, value any) {
+	if m.isRequiredComponentState(componentId, stateName) {
+		m.sendAll(api.MessageState, &api.StateChange{
+			Id:    componentId,
+			Name:  stateName,
+			Value: value,
+		})
+	}
+}
+
+func (m *Manager) handleComponentAdd(compId string, attributes map[string]any) {
+	states := m.getRequiredComponentStates(compId)
+	filteredAttributes := make(map[string]any)
+
+	for _, name := range states {
+		if v, ok := attributes[name]; ok {
+			filteredAttributes[name] = v
+		}
+	}
+
+	m.sendAll(api.MessageAdd, &api.ComponentAdd{
+		Id:         compId,
+		Attributes: filteredAttributes,
+	})
+}
+
+func (m *Manager) handleComponentRemove(compId string) {
+	if m.isRequiredComponent(compId) {
+		m.sendAll(api.MessageRemove, &api.ComponentRemove{
+			Id: compId,
+		})
+	}
+}
+
+func (m *Manager) setRequiredComponentStates() {
+	m.requiredComponentStatesMux.Lock()
+	defer m.requiredComponentStatesMux.Unlock()
+
+	m.requiredComponentStates = make(map[string]map[string]struct{})
+
+	for _, rcs := range m.model.GetRequiredComponentStates() {
+		states, ok := m.requiredComponentStates[rcs.ComponentId]
+		if !ok {
+			states = make(map[string]struct{})
+			m.requiredComponentStates[rcs.ComponentId] = states
+		}
+
+		states[rcs.ComponentState] = struct{}{}
+	}
+}
+
+func (m *Manager) isRequiredComponent(compId string) bool {
+	m.requiredComponentStatesMux.Lock()
+	defer m.requiredComponentStatesMux.Unlock()
+
+	_, ok := m.requiredComponentStates[compId]
+	return ok
+}
+
+func (m *Manager) getRequiredComponentStates(compId string) []string {
+	m.requiredComponentStatesMux.Lock()
+	defer m.requiredComponentStatesMux.Unlock()
+
+	if states, ok := m.requiredComponentStates[compId]; ok {
+		names := slices.Collect(maps.Keys(states))
+		return names
+	}
+
+	return nil
+}
+
+func (m *Manager) isRequiredComponentState(componentId string, stateName string) bool {
+	m.requiredComponentStatesMux.Lock()
+	defer m.requiredComponentStatesMux.Unlock()
+
+	if states, ok := m.requiredComponentStates[componentId]; ok {
+		_, ok := states[stateName]
+		return ok
+	}
+
+	return false
+}
+
+func (m *Manager) sendInitialComponentStates(s *session) {
+	m.stateListener.stateMux.Lock()
+	defer m.stateListener.stateMux.Unlock()
+
+	for compId, states := range m.requiredComponentStates {
+		compState := m.stateListener.GetState(compId)
+		if compState == nil {
+			continue
+		}
+
+		msg := &api.ComponentAdd{
+			Id:         compId,
+			Attributes: make(map[string]any),
+		}
+
+		for stateName := range states {
+			msg.Attributes[stateName] = compState[stateName]
+		}
+
+		m.sendOne(s, api.MessageAdd, msg)
 	}
 }
 

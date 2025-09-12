@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"math"
 	"mylife-home-common/components"
 	"mylife-home-common/components/metadata"
 	"mylife-home-common/tools"
@@ -12,6 +13,9 @@ type stateListener struct {
 	componentChangeChan chan *components.ComponentChange
 
 	onChange func(componentId string, stateName string, value any)
+	onAdd    func(componentId string, attributes map[string]any)
+	onRemove func(componentId string)
+
 	state    map[string]map[string]any
 	stateMux sync.Mutex
 
@@ -23,11 +27,18 @@ type subscription struct {
 	ch    chan any
 }
 
-func newStateListener(registry components.Registry, onChange func(componentId string, stateName string, value any)) *stateListener {
+func newStateListener(
+	registry components.Registry,
+	onChange func(componentId string, stateName string, value any),
+	onAdd func(componentId string, attributes map[string]any),
+	onRemove func(componentId string),
+) *stateListener {
 	l := &stateListener{
 		registry:            registry,
 		componentChangeChan: make(chan *components.ComponentChange),
 		onChange:            onChange,
+		onAdd:               onAdd,
+		onRemove:            onRemove,
 		state:               make(map[string]map[string]any),
 		subscriptions:       make(map[string]subscription),
 	}
@@ -111,30 +122,41 @@ func (l *stateListener) handleComponentChange(change *components.ComponentChange
 }
 
 func (l *stateListener) handleComponentAdd(comp components.Component, merger *tools.ChannelMerger[stateChange]) {
+	state := make(map[string]any)
+
 	for _, name := range l.getStateNames(comp) {
 		key := comp.Id() + ":" + name
 		value := comp.StateItem(name)
+		state[name] = value.Get()
 
 		sub := subscription{
 			value: value,
-			ch:    make(chan any, 10), // else subscribe current value below will deadlock
+			ch:    make(chan any),
 		}
 
-		sub.value.Subscribe(sub.ch, true)
+		sub.value.Subscribe(sub.ch, false)
 		l.subscriptions[key] = sub
 
 		merger.Add(tools.MapChannel(sub.ch, func(v any) stateChange {
 			return stateChange{
 				componentId: comp.Id(),
 				stateName:   name,
-				value:       v,
+				value:       l.nanToNil(v),
 			}
 		}))
 	}
 
 	l.stateMux.Lock()
-	l.state[comp.Id()] = make(map[string]any)
+	l.state[comp.Id()] = state
 	l.stateMux.Unlock()
+
+	// Copy before notifying
+	attributes := make(map[string]any)
+	for k, v := range state {
+		attributes[k] = l.nanToNil(v)
+	}
+
+	l.onAdd(comp.Id(), attributes)
 }
 
 func (l *stateListener) handleComponentRemove(comp components.Component) {
@@ -150,6 +172,8 @@ func (l *stateListener) handleComponentRemove(comp components.Component) {
 	l.stateMux.Lock()
 	l.state[comp.Id()] = make(map[string]any)
 	l.stateMux.Unlock()
+
+	l.onRemove(comp.Id())
 }
 
 func (l *stateListener) getStateNames(comp components.Component) []string {
@@ -183,4 +207,15 @@ func (l *stateListener) updateState(change stateChange) {
 	}
 
 	compState[change.stateName] = change.value
+}
+
+func (l *stateListener) nanToNil(v any) any {
+	switch v := v.(type) {
+	case float64:
+		if math.IsNaN(v) {
+			return nil
+		}
+	}
+
+	return v
 }
