@@ -12,9 +12,12 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/ws': {
-        target: `ws://localhost:8001`,
+        target: 'ws://localhost:8001',
         ws: true,
       },
+      '/resources': {
+        target: 'http://localhost:8001',
+      }
     }
   },
   build: {
