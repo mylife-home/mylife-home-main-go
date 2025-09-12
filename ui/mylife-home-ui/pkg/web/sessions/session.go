@@ -53,6 +53,10 @@ func (s *session) start() {
 
 func (s *session) readWorker() {
 	for {
+		if s.ctx.Err() != nil {
+			return
+		}
+
 		var msg api.SocketMessage
 		err := wsjson.Read(s.ctx, s.conn, &msg)
 		if err != nil {
