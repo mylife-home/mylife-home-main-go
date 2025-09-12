@@ -2,7 +2,7 @@ import { Middleware } from 'redux';
 import { PayloadAction } from '@reduxjs/toolkit';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import { ActionComponent } from '../../api/model';
-import { SocketMessage } from '../../api/socket';
+import { SocketMessage, ActionMessage } from '../../api/socket';
 import { ACTION_COMPONENT } from '../types/actions';
 import { onlineSet } from '../actions/online';
 import { reset, componentAdd, componentRemove, attributeChange } from '../actions/registry';
@@ -45,14 +45,14 @@ export const socketMiddleware: Middleware = (store) => (next) => {
   return (action) => {
     if (action.type === ACTION_COMPONENT) {
       const typedAction = action as PayloadAction<ActionComponent>;
-      send(socket, 'action', typedAction.payload);
+      send(socket, 'action', typedAction.payload as ActionMessage);
     }
 
     return next(action);
   };
 };
 
-function send(socket: WebSocket, type: string, data: any) {
-  const message: SocketMessage = { type: 'action', data };
+function send(socket: WebSocket, type: SocketMessage['type'], data: ActionMessage) {
+  const message: SocketMessage = { type, data };
   socket.send(JSON.stringify(message));
 }
