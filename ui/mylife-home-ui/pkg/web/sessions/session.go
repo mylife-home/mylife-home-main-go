@@ -2,9 +2,9 @@ package sessions
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"mylife-home-ui/pkg/web/api"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -54,11 +54,17 @@ func (s *session) start() {
 func (s *session) readWorker() {
 	for {
 		var msg api.SocketMessage
-		fmt.Println("Reading message...")
 		err := wsjson.Read(s.ctx, s.conn, &msg)
-		fmt.Println("Read complete.")
 		if err != nil {
-			if errors.Is(err, context.Canceled) {
+			// Connection closing
+			if s.ctx.Err() != nil {
+				return
+			}
+
+			// Note: cannot assert on real errors since the library does not export them
+			if strings.Contains(err.Error(), "received close frame") {
+				logger.Debugf("Session %s closed by client", s.id)
+				s.Terminate()
 				return
 			}
 
