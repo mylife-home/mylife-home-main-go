@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"mylife-home-ui/pkg/model"
+	"mylife-home-ui/pkg/web/sessions"
 	"net/http"
 	"time"
 
@@ -19,31 +20,22 @@ type webConfig struct {
 }
 
 type WebServer struct {
-	server   *http.Server
-	registry components.Registry
-	model    *model.ModelManager
-	config   webConfig
+	server         *http.Server
+	registry       components.Registry
+	model          *model.ModelManager
+	sessionManager *sessions.Manager
+	config         webConfig
 }
 
 func NewWebServer(registry components.Registry, model *model.ModelManager) *WebServer {
-	conf := webConfig{}
-	config.BindStructure("web", &conf)
-
 	ws := &WebServer{
-		registry: registry,
-		model:    model,
-		config:   conf,
+		registry:       registry,
+		model:          model,
+		sessionManager: sessions.NewManager(model),
 	}
 
-	if err := ws.start(); err != nil {
-		panic(fmt.Sprintf("Failed to start web server: %v", err))
-	}
+	config.BindStructure("web", &ws.config)
 
-	return ws
-}
-
-// Start starts the web server
-func (ws *WebServer) start() error {
 	mux := http.NewServeMux()
 
 	ws.setupRepository(mux)
@@ -60,16 +52,17 @@ func (ws *WebServer) start() error {
 
 	go func() {
 		if err := ws.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Errorf("Web server failed to run: %v", err)
+			panic(fmt.Sprintf("Failed to start web server: %v", err))
 		}
 	}()
 
-	return nil
+	return ws
 }
 
-// Stop gracefully stops the web server
 func (ws *WebServer) Terminate() {
 	logger.Info("Stopping web server")
+
+	ws.sessionManager.Terminate()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -77,4 +70,8 @@ func (ws *WebServer) Terminate() {
 	if err := ws.server.Shutdown(ctx); err != nil {
 		logger.Errorf("Error during web server shutdown: %v", err)
 	}
+}
+
+func (ws *WebServer) setupSessions(mux *http.ServeMux) {
+	mux.HandleFunc("/ws", ws.sessionManager.HandleWebSocket)
 }

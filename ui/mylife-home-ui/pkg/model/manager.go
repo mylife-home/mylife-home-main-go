@@ -58,6 +58,10 @@ func (mm *ModelManager) GetModelHash() string {
 	return mm.modelHash
 }
 
+func (mm *ModelManager) OnUpdate() tools.Observable[struct{}] {
+	return mm.onUpdate
+}
+
 // Given without copy, do not modify
 func (mm *ModelManager) GetRequiredComponentStates() []RequiredComponentState {
 	// Atomic read, no lock needed (only replaced on update)
