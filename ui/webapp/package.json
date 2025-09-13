@@ -31,7 +31,6 @@
     "jss-preset-default": "^10.10.0",
     "preact": "^10.24.3",
     "react-redux": "^9.1.2",
-    "reconnecting-websocket": "^4.4.0",
     "redux": "^5.0.1",
     "redux-logger": "^3.0.6",
     "redux-thunk": "^3.1.0",
