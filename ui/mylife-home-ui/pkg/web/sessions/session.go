@@ -76,7 +76,7 @@ func (s *session) readWorker() {
 			continue
 		}
 
-		logger.Debugf("Received message on session %s: %s", s.id, msg.Type)
+		//logger.Debugf("Received message on session %s: %s", s.id, msg.Type)
 
 		// Reset the timeout timer on each message received
 		s.timeout.Reset(idleTimeout)
@@ -93,7 +93,7 @@ func (s *session) writeWorker() {
 			continue
 		}
 
-		logger.Debugf("Sent message on session %s: %s", s.id, msg.Type)
+		// logger.Debugf("Sent message on session %s: %s", s.id, msg.Type)
 	}
 }
 
