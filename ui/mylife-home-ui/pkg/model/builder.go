@@ -186,6 +186,8 @@ func (b *builder) translateControls(controls []Control) ([]api.Control, error) {
 			}
 
 			display = &api.ControlDisplay{
+				ComponentId:     control.Display.ComponentId,
+				ComponentState:  control.Display.ComponentState,
 				Map:             make([]api.ControlDisplayMapItem, 0, len(control.Display.Map)),
 				DefaultResource: defaultResource,
 			}
