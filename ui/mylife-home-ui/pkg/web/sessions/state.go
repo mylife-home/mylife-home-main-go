@@ -209,6 +209,7 @@ func (l *stateListener) updateState(change stateChange) {
 	compState[change.stateName] = change.value
 }
 
+// Note: Golang's encoding/json cannot marshal NaN to JSON, so we convert it to nil
 func (l *stateListener) nanToNil(v any) any {
 	switch v := v.(type) {
 	case float64:

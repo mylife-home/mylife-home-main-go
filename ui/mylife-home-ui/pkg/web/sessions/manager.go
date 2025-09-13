@@ -118,7 +118,7 @@ func (m *Manager) modelUpdateWorker() {
 
 func (m *Manager) handleStateChange(componentId string, stateName string, value any) {
 	if m.isRequiredComponentState(componentId, stateName) {
-		m.sendAll(api.MessageState, &api.StateChange{
+		m.sendAll(api.MessageChange, &api.StateChange{
 			Id:    componentId,
 			Name:  stateName,
 			Value: value,
@@ -200,8 +200,10 @@ func (m *Manager) isRequiredComponentState(componentId string, stateName string)
 }
 
 func (m *Manager) sendInitialComponentStates(s *session) {
-	m.stateListener.stateMux.Lock()
-	defer m.stateListener.stateMux.Unlock()
+	m.requiredComponentStatesMux.Lock()
+	defer m.requiredComponentStatesMux.Unlock()
+
+	msg := api.Reset(make(map[string]api.ComponentStates))
 
 	for compId, states := range m.requiredComponentStates {
 		compState := m.stateListener.GetState(compId)
@@ -209,17 +211,14 @@ func (m *Manager) sendInitialComponentStates(s *session) {
 			continue
 		}
 
-		msg := &api.ComponentAdd{
-			Id:         compId,
-			Attributes: make(map[string]any),
-		}
-
+		attributes := make(map[string]any)
 		for stateName := range states {
-			msg.Attributes[stateName] = compState[stateName]
+			attributes[stateName] = compState[stateName]
 		}
-
-		m.sendOne(s, api.MessageAdd, msg)
+		msg[compId] = attributes
 	}
+
+	m.sendOne(s, api.MessageState, msg)
 }
 
 func (m *Manager) sendAll(ty api.MessageType, object any) {
