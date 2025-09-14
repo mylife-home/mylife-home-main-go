@@ -3,4 +3,4 @@ bus:
 web:
   port: ${WEB_PORT|80}
 model:
-  dataPath: ${DATA_PATH|/data}/store.json
+  storePath: ${DATA_PATH|/data}/store.json
