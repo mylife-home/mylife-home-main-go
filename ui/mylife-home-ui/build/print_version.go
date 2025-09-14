@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mylife-home-core/pkg/version"
+	"mylife-home-ui/pkg/version"
 )
 
 func main() {
