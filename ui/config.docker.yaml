@@ -1,0 +1,6 @@
+bus:
+  serverUrl: ${BUS_SERVER|tcp://localhost}
+web:
+  port: ${WEB_PORT|80}
+model:
+  dataPath: ${DATA_PATH|/data}/store.json
