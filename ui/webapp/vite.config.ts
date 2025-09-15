@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
-import { viteSingleFile } from 'vite-plugin-singlefile';
 
 export default defineConfig({
   root: 'src',
@@ -23,16 +22,6 @@ export default defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        // Put assets directly in root, not in assets folder
-        assetFileNames: '[name].[ext]',
-      }
-    },
   },
-  plugins: [preact(), viteSingleFile({
-    useRecommendedBuildConfig: false,
-    removeViteModuleLoader: true,
-    inlinePattern: ['**/*.js', '**/*.css'], // Only inline JS and CSS
-  })],
+  plugins: [preact()],
 });
