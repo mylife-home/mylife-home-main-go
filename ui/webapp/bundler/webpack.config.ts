@@ -49,20 +49,13 @@ export default () => {
     module: {
       rules: [
         {
-          //https://github.com/webpack/webpack/issues/11467
-          test: /\.m?js/,
-          resolve: {
-            fullySpecified: false
-          }
-        },
-        {
           test: /\.ts(x?)$/,
           use: [
             { loader: 'babel-loader', options: babelOptions },
             { loader: 'ts-loader', options: { configFile: path.join(basePath, 'tsconfig.json') } },
           ],
         },
-        { test: /\.js$/, use: [{ loader: 'babel-loader', options: babelOptions }] },
+        { test: /\.(m|c?)js$/, use: [{ loader: 'babel-loader', options: babelOptions }] },
         { test: /\.css$/, use: [styleLoader, 'css-loader'] },
         { test: /\.scss$/, use: [styleLoader, 'css-loader', 'sass-loader'] },
         { test: /\.(png|jpg|gif|svg|eot|woff|woff2|ttf|ico)$/, use: ['file-loader'] },
