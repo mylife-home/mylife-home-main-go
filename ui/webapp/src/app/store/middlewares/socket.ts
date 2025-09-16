@@ -46,7 +46,7 @@ export const socketMiddleware: Middleware = (store) => (next) => {
     }
   };
 
-  return (action) => {
+  return (action: any) => {
     if (action.type === ACTION_COMPONENT) {
       const typedAction = action as PayloadAction<ActionComponent>;
       socket.send('action', typedAction.payload as ActionMessage);
