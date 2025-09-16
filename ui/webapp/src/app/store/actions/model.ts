@@ -1,6 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import { AppThunkAction } from '../types';
 import { CSS_SET } from '../types/css';
+import { NetModel } from '../types/model';
 import { resourceQuery } from './resources';
 import { viewInit } from './view';
 

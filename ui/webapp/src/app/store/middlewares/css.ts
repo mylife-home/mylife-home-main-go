@@ -2,7 +2,7 @@ import { Middleware } from 'redux';
 import { PayloadAction } from '@reduxjs/toolkit';
 import { CSS_SET } from '../types/css';
 
-export const cssMiddleware: Middleware = (store) => (next) => (action) => {
+export const cssMiddleware: Middleware = (store) => (next) => (action: any) => {
   if (action.type === CSS_SET) {
     const typedAction = action as PayloadAction<string>;
     const resource = typedAction.payload;

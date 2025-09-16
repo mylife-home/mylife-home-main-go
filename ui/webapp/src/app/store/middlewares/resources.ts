@@ -3,7 +3,7 @@ import { PayloadAction } from '@reduxjs/toolkit';
 import 'whatwg-fetch';
 import { ResourceQuery, RESOURCE_QUERY } from '../types/resources';
 
-export const resourcesMiddleware: Middleware = (store) => (next) => (action) => {
+export const resourcesMiddleware: Middleware = (store) => (next) => (action: any) => {
   if (action.type === RESOURCE_QUERY) {
     const typedAction = action as PayloadAction<ResourceQuery>;
     const { onContent, resource } = typedAction.payload;

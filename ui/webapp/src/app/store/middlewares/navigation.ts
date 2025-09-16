@@ -15,7 +15,7 @@ export const navigationMiddleware: Middleware = (store) => (next) => {
   window.onhashchange = onHashChanged;
   setTimeout(onHashChanged, 0);
 
-  return (action) => {
+  return (action: any) => {
 
     if (action.type === NAVIGATION_PUSH) {
       window.location.hash = action.payload;
