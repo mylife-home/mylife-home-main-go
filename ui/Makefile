@@ -11,6 +11,7 @@ OUTPUT_BINARY ?= bin/mylife-home-ui
 prepare:
 	go mod download
 	cd webapp && npm install
+	cd webapp/bundler && npm install
 	go install github.com/gzuidhof/tygo@latest
 
 generate:
