@@ -17,7 +17,7 @@ generate:
 	go run mylife-home-ui/build/gen_api.go
 
 build: generate
-	cd webapp && npm run build
+	cd webapp/bundler && npm run build
 	mkdir -p $(dir $(OUTPUT_BINARY))
 	CGO_ENABLED=0 go build -o $(OUTPUT_BINARY) mylife-home-ui/main.go
 	# go vet -v
