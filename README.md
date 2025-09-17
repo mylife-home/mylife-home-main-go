@@ -9,6 +9,8 @@ MyLife Home Main, Golang implementation
   - main: `core/mylife-home-core/pkg/version/value.go`
   - plugins: `core/plugins/*/main.go`
   - [github release (match core, only for rpi-alpine-build)](https://github.com/mylife-home/mylife-home-core-go/releases)
+- ui:
+  - main: `ui/mylife-home-ui/pkg/version/value.go`
 
 ## Components
 
