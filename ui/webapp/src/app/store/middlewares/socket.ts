@@ -13,7 +13,8 @@ const BASE_RECONNECT_DELAY = 1000;   // Start retry after 1s
 const MAX_RECONNECT_DELAY = 10000;   // Cap retries at 10s
 
 export const socketMiddleware: Middleware = (store) => (next) => {
-  const url = location.origin.replace(/^http/, 'ws') + '/ws';
+  // Note: do not use /ws if you want to use webpack.devServer.
+  const url = location.origin.replace(/^http/, 'ws') + '/websocket';
   const socket = new ReconnectingWebSocket(url);
 
   socket.onopen = () => {
