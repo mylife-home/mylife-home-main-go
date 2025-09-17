@@ -10,8 +10,8 @@ import PurgecssPlugin from 'purgecss-webpack-plugin';
 
 type ConfigurationByMode = { [mode: string]: Configuration; };
 
-export default () => {
-  const mode = process.env.NODE_ENV === 'development' ? 'dev' : 'prod';
+export default (env: any, argv: any) => {
+  const mode = argv.mode === 'development' ? 'dev' : 'prod';
 
   const babelOptions = {
     presets: [
@@ -86,7 +86,7 @@ export default () => {
             },
           },
         },
-      }
+      },
     },
     prod: {
       mode: 'production',
@@ -113,5 +113,19 @@ export default () => {
     throw new Error(`Unsupported mode: '${mode}`);
   }
 
-  return merge(base, modeConfig);
+  const devServerConfig: Configuration = {};
+
+  if (mode === 'dev') {
+    (devServerConfig as any).devServer = {
+      host: '0.0.0.0',
+      port: 8101,
+      allowedHosts: 'all',
+      proxy: [
+        { context: ['/resources', '/repository'], target: 'http://localhost:8001' },
+        { context: ['/websocket'], target: 'ws://localhost:8001', ws: true },
+      ],
+    };
+  }
+
+  return merge(base, modeConfig, devServerConfig);
 };

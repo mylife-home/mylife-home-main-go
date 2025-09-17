@@ -32,7 +32,7 @@ docker-build:
 	docker build --pull -t "$(DOCKER_IMAGE_TAG)" -t "$(DOCKER_IMAGE_LATEST_TAG)" -f Dockerfile ..
 
 run-ui: generate
-	cd webapp && npm run dev
+	cd webapp/bundler && npm run dev
 
 run:
 	go run mylife-home-ui/main.go --log-console
