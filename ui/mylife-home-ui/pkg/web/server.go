@@ -73,5 +73,5 @@ func (ws *WebServer) Terminate() {
 }
 
 func (ws *WebServer) setupSessions(mux *http.ServeMux) {
-	mux.HandleFunc("/ws", ws.sessionManager.HandleWebSocket)
+	mux.HandleFunc("/websocket", ws.sessionManager.HandleWebSocket)
 }
