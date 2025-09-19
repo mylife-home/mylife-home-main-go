@@ -27,7 +27,7 @@ const View: FunctionComponent = () => {
 export default View;
 
 function useConnect() {
-  return useSelector((state: AppState) => ({
-    view: getView(state)
-  }));
+  return {
+    view: useSelector(getView)
+  };
 }

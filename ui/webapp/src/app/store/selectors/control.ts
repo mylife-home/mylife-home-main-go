@@ -1,6 +1,6 @@
 import { createSelector } from 'reselect';
 import { AppState } from '../types';
-import { getComponentState } from './registry';
+import { getRegistry } from './registry';
 import { ControlDisplayMapItem, ControlText, ControlDisplay, Resource } from '../types/model';
 import { getWindowControl } from './model';
 
@@ -66,25 +66,19 @@ export const makeGetUIControl = (windowId: string, controlId: string): (state: A
     }
   );
 
-  return state => {
-    const { template, requiredComponentStates, displayResourceResolver, textResolver } = getStaticModel(state);
-    const componentStates = getRequiredComponentStates(state, requiredComponentStates);
+  return createSelector([getStaticModel, getRegistry], ({ template, requiredComponentStates, displayResourceResolver, textResolver }, registry): UIControl => {
+    const componentStates: ProvidedComponentStates = {};
+    for (const { componentId, componentState } of requiredComponentStates) {
+      componentStates[`${componentId}$${componentState}`] = registry?.[componentId]?.[componentState];
+    }
 
     return {
       ...template,
       displayResource: displayResourceResolver(componentStates),
       text: textResolver(componentStates)
     };
-  };
+  });
 };
-
-function getRequiredComponentStates(state: AppState, requiredComponentStates: RequiredComponentState[]) {
-  const componentStates: ProvidedComponentStates = {};
-  for (const { componentId, componentState } of requiredComponentStates) {
-    componentStates[`${componentId}$${componentState}`] = getComponentState(state, componentId, componentState);
-  }
-  return componentStates;
-}
 
 function createResourceDisplayResolver(display: ControlDisplay): (componentStates: ProvidedComponentStates) => Resource {
   if (!display) {

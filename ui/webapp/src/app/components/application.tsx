@@ -35,8 +35,8 @@ const AppContent: FunctionComponent = () => {
 };
 
 function useConnect() {
-  return useSelector((state: AppState) => ({
-    online: getOnline(state),
-    ready: hasView(state) && hasWindows(state),
-  }));
+  return {
+    online: useSelector(getOnline),
+    ready: useSelector((state: AppState) => hasView(state) && hasWindows(state)),
+  };
 }

@@ -41,9 +41,7 @@ function useConnect(windowId: string, controlId: string) {
   const dispatch = useDispatch<AppThunkDispatch>();
   const getUIControl = useMemo(() => makeGetUIControl(windowId, controlId), [windowId, controlId]);
   return {
-    ...useSelector((state: AppState) => ({
-      control: getUIControl(state)
-    })),
+    control: useSelector((state: AppState) => getUIControl(state)),
     ...useMemo(() => ({
       onActionPrimary: () => dispatch(actionPrimary(windowId, controlId)),
       onActionSecondary: () => dispatch(actionSecondary(windowId, controlId))

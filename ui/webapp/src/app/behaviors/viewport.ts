@@ -19,9 +19,9 @@ export function useViewport(windowId: string) {
 }
 
 function useConnect(windowId: string) {
-  return useSelector((state: AppState) => ({
-    window: getWindow(state, windowId)
-  }));
+  return {
+    window: useSelector((state: AppState) => getWindow(state, windowId))
+  };
 }
 
 function useMobileViewport(size: Size) {
