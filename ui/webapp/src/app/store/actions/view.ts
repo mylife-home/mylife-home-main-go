@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import { AppThunkAction } from '../types';
-import { getView, hasView, isViewPopup } from '../selectors/view';
-import { hasWindow, getDefaultWindowId } from '../selectors/model';
+import { getView, isViewPopup } from '../selectors/view';
+import { hasWindows, hasWindow, getDefaultWindowId } from '../selectors/model';
 import { isMobile } from '../../utils/detect-browser';
 import { navigate } from './navigation';
 
@@ -22,7 +22,10 @@ export const viewNavigationChange = (windowId: string): AppThunkAction => (dispa
   const state = getState();
 
   // ensure that the window exists
-  if (!hasWindow(state, windowId)) {
+  if (!hasWindows(state)) {
+    // we skip the check if model not loaded yet (will be checked in viewInit)
+    console.log('model not loaded yet, ignoring navigation check'); // eslint-disable-line no-console
+  } else if (!hasWindow(state, windowId)) {
     dispatch(navigateToDefault());
     return;
   }

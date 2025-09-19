@@ -1,9 +1,7 @@
 import React, { FunctionComponent } from 'react';
 import { useSelector } from 'react-redux';
-import { AppState } from '../store/types';
 import { getOnline } from '../store/selectors/online';
-import { hasView } from '../store/selectors/view';
-import { hasWindows } from '../store/selectors/model';
+import { isReady } from '../store/selectors/view';
 import Offline from './offline';
 import Loading from './loading';
 import View from './view';
@@ -37,6 +35,6 @@ const AppContent: FunctionComponent = () => {
 function useConnect() {
   return {
     online: useSelector(getOnline),
-    ready: useSelector((state: AppState) => hasView(state) && hasWindows(state)),
+    ready: useSelector(isReady),
   };
 }

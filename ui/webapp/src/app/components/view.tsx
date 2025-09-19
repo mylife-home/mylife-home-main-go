@@ -1,6 +1,5 @@
 import React, { FunctionComponent } from 'react';
 import { useSelector } from 'react-redux';
-import { AppState } from '../store/types';
 import { getView } from '../store/selectors/view';
 import WindowContent from './window-content';
 import Popup from './popup';
