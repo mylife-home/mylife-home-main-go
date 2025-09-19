@@ -7,9 +7,9 @@ import { onlineSet } from '../actions/online';
 import { reset, componentAdd, componentRemove, attributeChange } from '../actions/registry';
 import { modelInit } from '../actions/model';
 
-const PING_INTERVAL = 2000;          // Send ping every 2s
-const IDLE_TIMEOUT = 5000;           // If no messages for 5s → reconnect
-const BASE_RECONNECT_DELAY = 1000;   // Start retry after 1s
+const PING_INTERVAL = 500;          // Send ping every 0.5s
+const IDLE_TIMEOUT = 1000;           // If no messages for 1s → reconnect
+const BASE_RECONNECT_DELAY = 500;   // Start retry after 0.5s
 const MAX_RECONNECT_DELAY = 10000;   // Cap retries at 10s
 
 export const socketMiddleware: Middleware = (store) => (next) => {
