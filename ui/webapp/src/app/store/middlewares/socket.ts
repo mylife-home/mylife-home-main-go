@@ -65,6 +65,7 @@ export const socketMiddleware: Middleware = (store) => (next) => {
 
 type Timer = ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>;
 type SocketMessageType = SocketMessage['type'];
+
 class ReconnectingWebSocket {
   private url: string;
   private ws: WebSocket | null = null;
@@ -82,7 +83,7 @@ class ReconnectingWebSocket {
     this.connect();
   }
 
-  private connect(): void {
+  private connect() {
     this.ws = new WebSocket(this.url);
 
     this.ws.onopen = () => {
@@ -130,10 +131,8 @@ class ReconnectingWebSocket {
     };
   }
 
-  private resetIdleTimer(): void {
-    if (this.idleTimeout) {
-      clearTimeout(this.idleTimeout);
-    }
+  private resetIdleTimer() {
+    clearTimeout(this.idleTimeout);
 
     this.idleTimeout = setTimeout(() => {
       if (isBackground) {
@@ -146,9 +145,9 @@ class ReconnectingWebSocket {
     }, IDLE_TIMEOUT);
   }
 
-  private cleanup(): void {
-    if (this.pingInterval) clearInterval(this.pingInterval);
-    if (this.idleTimeout) clearTimeout(this.idleTimeout);
+  private cleanup() {
+    clearInterval(this.pingInterval);
+    clearTimeout(this.idleTimeout);
   }
 
   public send(type: SocketMessageType, data: any) {
