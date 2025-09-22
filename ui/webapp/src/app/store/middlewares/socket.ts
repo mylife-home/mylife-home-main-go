@@ -7,10 +7,16 @@ import { onlineSet } from '../actions/online';
 import { reset, componentAdd, componentRemove, attributeChange } from '../actions/registry';
 import { modelInit } from '../actions/model';
 
-const PING_INTERVAL = 500;          // Send ping every 0.5s
-const IDLE_TIMEOUT = 1000;           // If no messages for 1s → reconnect
-const BASE_RECONNECT_DELAY = 500;   // Start retry after 0.5s
-const MAX_RECONNECT_DELAY = 10000;   // Cap retries at 10s
+const PING_INTERVAL = 500;         // Send ping every 0.5s
+const IDLE_TIMEOUT = 1000;         // If no messages for 1s → reconnect
+const BASE_RECONNECT_DELAY = 500;  // Start retry after 0.5s
+const MAX_RECONNECT_DELAY = 10000; // Cap retries at 10s
+
+let isBackground = false;
+
+document.addEventListener("visibilitychange", () => {
+  isBackground = document.hidden;
+});
 
 export const socketMiddleware: Middleware = (store) => (next) => {
   // Note: do not use /ws if you want to use webpack.devServer.
@@ -125,10 +131,18 @@ class ReconnectingWebSocket {
   }
 
   private resetIdleTimer(): void {
-    if (this.idleTimeout) clearTimeout(this.idleTimeout);
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+    }
+
     this.idleTimeout = setTimeout(() => {
-      console.warn("Idle timeout, forcing reconnect...");
-      this.ws?.close(); // triggers onclose
+      if (isBackground) {
+        console.warn("Idle timeout while background, ignoring");
+        this.resetIdleTimer();
+      } else {
+        console.warn("Idle timeout, forcing reconnect...");
+        this.ws?.close(); // triggers onclose
+      }
     }, IDLE_TIMEOUT);
   }
 
