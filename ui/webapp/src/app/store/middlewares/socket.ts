@@ -69,6 +69,7 @@ type SocketMessageType = SocketMessage['type'];
 class ReconnectingWebSocket {
   private url: string;
   private ws: WebSocket | null = null;
+  private closeCalled: boolean = false;
   private pingInterval: Timer | null = null;
   private idleTimeout: Timer | null = null;
   private reconnectDelay: number = BASE_RECONNECT_DELAY;
@@ -85,6 +86,7 @@ class ReconnectingWebSocket {
 
   private connect() {
     this.ws = new WebSocket(this.url);
+    this.closeCalled = false;
 
     this.ws.onopen = () => {
       console.log("Connected to", this.url);
@@ -115,19 +117,12 @@ class ReconnectingWebSocket {
     };
 
     this.ws.onclose = () => {
-      console.warn("Connection closed, retrying in", this.reconnectDelay, "ms");
-      this.cleanup();
-      setTimeout(() => this.connect(), this.reconnectDelay);
-
-      // Exponential backoff
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, MAX_RECONNECT_DELAY);
-
-      this.onclose();
+      this.wsClose();
     };
 
     this.ws.onerror = (err: Event) => {
       console.error("WebSocket error:", err);
-      this.ws?.close(); // triggers onclose
+      this.wsClose();
     };
   }
 
@@ -140,9 +135,29 @@ class ReconnectingWebSocket {
         this.resetIdleTimer();
       } else {
         console.warn("Idle timeout, forcing reconnect...");
-        this.ws?.close(); // triggers onclose
+        this.wsClose();
       }
     }, IDLE_TIMEOUT);
+  }
+
+  private wsClose() {
+    if (this.closeCalled) {
+      return;
+    }
+
+    this.closeCalled = true;
+
+    this.ws?.close();
+    this.ws = null;
+
+    console.warn("Connection closed, retrying in", this.reconnectDelay, "ms");
+    this.cleanup();
+    setTimeout(() => this.connect(), this.reconnectDelay);
+
+    // Exponential backoff
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, MAX_RECONNECT_DELAY);
+
+    this.onclose();
   }
 
   private cleanup() {
