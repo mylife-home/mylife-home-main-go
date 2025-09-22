@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mylife-home-ui/pkg/web/api"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -22,6 +23,7 @@ type session struct {
 	onClose   func()
 	onMessage func(msg *api.SocketMessage)
 	timeout   *time.Timer
+	termMux   sync.Mutex // Mutex to protect termination
 }
 
 func newSession(id string, conn *websocket.Conn) *session {
@@ -115,9 +117,22 @@ func (s *session) error(err error) {
 	s.Terminate()
 }
 
-func (s *session) Terminate() {
+// termCheck checks if the session is already terminated, if not it marks it as terminated.
+func (s *session) termCheck() bool {
+	s.termMux.Lock()
+	defer s.termMux.Unlock()
+
 	if s.ctx.Err() != nil {
 		// Already terminated
+		return false
+	}
+
+	s.cancel()
+	return true
+}
+
+func (s *session) Terminate() {
+	if !s.termCheck() {
 		return
 	}
 
@@ -125,7 +140,6 @@ func (s *session) Terminate() {
 
 	close(s.sendChan)
 
-	s.cancel()
 	s.timeout.Stop()
 	// s.conn.Close(websocket.StatusNormalClosure, "")
 	s.conn.CloseNow()
