@@ -13,6 +13,7 @@ import (
 )
 
 const idleTimeout = 30 * time.Second
+const pingTimeout = 5 * time.Second
 
 type session struct {
 	id        string
@@ -100,14 +101,39 @@ func (s *session) writeWorker() {
 }
 
 func (s *session) timeoutWorker() {
-	select {
-	case <-s.timeout.C:
-		s.error(fmt.Errorf("session %s timed out after %s of inactivity", s.id, idleTimeout))
-	case <-s.ctx.Done():
-		// Session is being terminated, stop the timeout worker
-		s.timeout.Stop()
+	for {
+		select {
+		case <-s.timeout.C:
+			s.sendWebSocketPing()
+		case <-s.ctx.Done():
+			// Session is being terminated, stop the timeout worker
+			s.timeout.Stop()
+			return
+		}
+	}
+}
+
+func (s *session) sendWebSocketPing() {
+	// logger.Debugf("Sending WebSocket ping to session %s after %s of inactivity", s.id, idleTimeout)
+
+	// Create a context with timeout for the ping operation
+	pingCtx, cancel := context.WithTimeout(s.ctx, pingTimeout)
+	defer cancel()
+
+	// Use the built-in WebSocket ping which sends a ping and waits for pong
+	err := s.conn.Ping(pingCtx)
+	if err != nil {
+		// Ping failed or timed out
+		if pingCtx.Err() == context.DeadlineExceeded {
+			s.error(fmt.Errorf("session %s did not respond to WebSocket ping within %s", s.id, pingTimeout))
+		} else {
+			s.error(fmt.Errorf("WebSocket ping failed for session %s: %v", s.id, err))
+		}
 		return
 	}
+
+	// logger.Debugf("Received WebSocket pong from session %s", s.id)
+	s.timeout.Reset(idleTimeout)
 }
 
 func (s *session) error(err error) {
