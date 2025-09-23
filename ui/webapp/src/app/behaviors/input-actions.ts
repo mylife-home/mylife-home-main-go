@@ -1,45 +1,66 @@
-import { useMemo, useState, useCallback } from 'react';
-import InputManager from '../utils/input-manager';
+import { useState, useRef, useCallback } from "react";
 
-type InputActionCallback = () => void;
+type State = 'primary' | 'secondary' | 'none';
 
-export function useInputActions(onActionPrimary: InputActionCallback, onActionSecondary: InputActionCallback) {
-  const [isActive, setActive] = useState(false);
+export function useInputActions(
+  onActionPrimary: () => void,
+  onActionSecondary: () => void,
+  threshold: number = 300,
+) {
+  const [state, setState] = useState<State>('none');
+  const timerRef = useRef<number | null>(null);
 
-  const inputManager = useMemo(() => {
-    const inputManager = new InputManager();
-    inputManager.config = {
-      s: onActionPrimary,
-      l: onActionSecondary,
-      ss: onActionSecondary,
-    };
+  const startPress = useCallback(
+    (e: React.SyntheticEvent) => {
+      e.preventDefault();
 
-    return inputManager;
-  }, [onActionPrimary, onActionSecondary]);
+      setState('primary');
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
+      timerRef.current = window.setTimeout(() => {
+        setState('secondary');
+      }, threshold);
+    },
+    [onActionSecondary, threshold]
+  );
+
+  const endPress = useCallback(
+    (e: React.SyntheticEvent) => {
+      e.preventDefault();
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      switch (state) {
+      case 'primary':
+        onActionPrimary();
+        break;
+      case 'secondary':
+        onActionSecondary();
+        break;
+      }
+
+      setState('none');
+    },
+    [state, onActionPrimary, onActionSecondary]
+  );
+
+  const cancelPress = useCallback((e: React.SyntheticEvent) => {
     e.preventDefault();
-    inputManager.down();
-    setActive(true);
-  }, [inputManager, setActive]);
 
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    inputManager.up();
-    setActive(false);
-  }, [inputManager, setActive]);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    inputManager.down();
-    setActive(true);
-  }, [inputManager, setActive]);
+    setState('none');
+  }, []);
 
-  const onMouseUp = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    inputManager.up();
-    setActive(false);
-  }, [inputManager, setActive]);
-
-  return { isActive, onTouchStart, onTouchEnd, onMouseDown, onMouseUp };
+  return {
+    state,
+    startPress,
+    endPress,
+    cancelPress,
+  };
 }

@@ -13,20 +13,29 @@ type ControlProps = {
 
 const Control: FunctionComponent<ControlProps> = ({ windowId, controlId }) => {
   const { control, onActionPrimary, onActionSecondary } = useConnect(windowId, controlId);
-  const { isActive, onTouchStart, onTouchEnd, onMouseDown, onMouseUp } = useInputActions(onActionPrimary, onActionSecondary);
+  const { state, startPress, endPress, cancelPress } = useInputActions(onActionPrimary, onActionSecondary);
+  const active = state !== 'none';
 
   return (
-    <div
-      style={getStyleSizePosition(control)}
-      className={clsx(control.active ? 'mylife-control-button' : 'mylife-control-inactive', isActive && 'active', ...control.style)}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-      onMouseDown={onMouseDown}
-      onMouseUp={onMouseUp}
-    >
-      {control.displayResource && <img src={`/resources/${control.displayResource}`} />}
-      {control.text && <p>{control.text}</p>}
-    </div>
+    <>
+      {active && (
+        <div className={clsx('mylife-control-overlay', state === 'primary' && 'primary', state === 'secondary' && 'secondary')} />
+      )}
+
+      <div
+        style={getStyleSizePosition(control)}
+        className={clsx(control.active ? 'mylife-control-button' : 'mylife-control-inactive', active && 'active', ...control.style)}
+        onTouchStart={startPress}
+        onTouchEnd={endPress}
+        onTouchCancel={cancelPress}
+        onMouseDown={startPress}
+        onMouseUp={endPress}
+        onMouseLeave={cancelPress}
+      >
+        {control.displayResource && <img src={`/resources/${control.displayResource}`} />}
+        {control.text && <p>{control.text}</p>}
+      </div>
+    </>
   )
 };
 
