@@ -1,4 +1,4 @@
-# mylife-home-core-go
+# mylife-home-main-go
 
 MyLife Home Main, Golang implementation
 
