@@ -57,6 +57,9 @@ const Control: FunctionComponent<ControlProps> = ({ windowId, controlId }) => {
       >
         {control.displayResource && <img src={`/resources/${control.displayResource}`} />}
         {control.text && <p>{control.text}</p>}
+        {control.hasSecondaryAction && (
+          <div className="mylife-control-secondary-indicator" />
+        )}
       </div>
     </>
   )

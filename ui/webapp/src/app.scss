@@ -184,6 +184,18 @@ $secondary: #6c757d;
   }
 }
 
+.mylife-control-secondary-indicator {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-top: 8px solid rgba(0, 123, 255, 0.4);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .mylife-overlay {
   position: absolute;
   left: 0;
