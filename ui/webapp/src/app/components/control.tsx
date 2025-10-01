@@ -1,10 +1,11 @@
-import React, { FunctionComponent, useMemo } from 'react';
+import React, { FunctionComponent, useCallback, useMemo } from 'react';
 import clsx from 'clsx';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppState, AppThunkDispatch } from '../store/types';
 import { UIControl, makeGetUIControl } from '../store/selectors/control';
 import { actionPrimary, actionSecondary } from '../store/actions/actions';
-import { useInputActions } from '../behaviors/input-actions';
+import { useClickActions, useControlActive } from '../behaviors/input-actions';
+import { useFlashFeedback } from '../behaviors/flash-feedback';
 
 type ControlProps = {
   windowId: string;
@@ -13,24 +14,46 @@ type ControlProps = {
 
 const Control: FunctionComponent<ControlProps> = ({ windowId, controlId }) => {
   const { control, onActionPrimary, onActionSecondary } = useConnect(windowId, controlId);
-  const { state, startPress, endPress, cancelPress } = useInputActions(onActionPrimary, onActionSecondary);
-  const active = state !== 'none';
+  const { flash: flashPrimary, flashing: flashingPrimary } = useFlashFeedback();
+  const { flash: flashSecondary, flashing: flashingSecondary } = useFlashFeedback();
+  const { active, activate, deactivate } = useControlActive();
+
+  const handlePrimaryAction = useCallback(() => {
+    if (control.hasPrimaryAction) {
+      flashPrimary();
+      onActionPrimary();
+    }
+  }, [control, flashPrimary, onActionPrimary]);
+  
+  const handleSecondaryAction = useCallback(() => {
+    if (control.hasSecondaryAction) {
+      flashSecondary();
+      onActionSecondary();
+    }
+  }, [control, flashSecondary, onActionSecondary]);
+  
+  const { handleClick } = useClickActions(handlePrimaryAction, handleSecondaryAction);
 
   return (
     <>
-      {active && (
-        <div className={clsx('mylife-control-overlay', state === 'primary' && 'primary', state === 'secondary' && 'secondary')} />
+      {/* Screen flash overlay for visual feedback */}
+      {flashingPrimary && (
+        <div className="mylife-screen-flash mylife-screen-flash-primary" />
+      )}
+      {flashingSecondary && (
+        <div className="mylife-screen-flash mylife-screen-flash-secondary" />
       )}
 
       <div
         style={getStyleSizePosition(control)}
-        className={clsx(control.active ? 'mylife-control-button' : 'mylife-control-inactive', active && 'active', ...control.style)}
-        onTouchStart={startPress}
-        onTouchEnd={endPress}
-        onTouchCancel={cancelPress}
-        onMouseDown={startPress}
-        onMouseUp={endPress}
-        onMouseLeave={cancelPress}
+        className={clsx(control.hasPrimaryAction ? 'mylife-control-button' : 'mylife-control-inactive', { active }, ...control.style)}
+        onClick={handleClick}
+        onTouchStart={activate}
+        onTouchEnd={deactivate}
+        onTouchCancel={deactivate}
+        onMouseDown={activate}
+        onMouseUp={deactivate}
+        onMouseLeave={deactivate}
       >
         {control.displayResource && <img src={`/resources/${control.displayResource}`} />}
         {control.text && <p>{control.text}</p>}

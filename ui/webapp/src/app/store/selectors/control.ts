@@ -13,7 +13,8 @@ export interface UIControl {
   readonly style: string[];
   readonly displayResource: string;
   readonly text: string;
-  readonly active: boolean;
+  readonly hasPrimaryAction: boolean;
+  readonly hasSecondaryAction: boolean;
 }
 
 interface RequiredComponentState {
@@ -43,7 +44,8 @@ export const makeGetUIControl = (windowId: string, controlId: string): (state: A
         style: control.style,
         displayResource: null,
         text: null,
-        active: !!control.primaryAction,
+        hasPrimaryAction: !!control.primaryAction,
+        hasSecondaryAction: !!control.secondaryAction,
       };
 
       const { display, text } = control;

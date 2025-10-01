@@ -1,66 +1,58 @@
-import { useState, useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 
-type State = 'primary' | 'secondary' | 'none';
-
-export function useInputActions(
-  onActionPrimary: () => void,
-  onActionSecondary: () => void,
-  threshold: number = 300,
+export function useClickActions(
+  onSingleClick: () => void,
+  onDoubleClick: () => void,
+  delay: number = 300 // ms threshold between clicks
 ) {
-  const [state, setState] = useState<State>('none');
   const timerRef = useRef<number | null>(null);
+  const clickCountRef = useRef(0);
 
-  const startPress = useCallback(
+  const handleClick = useCallback(
     (e: React.SyntheticEvent) => {
       e.preventDefault();
 
-      setState('primary');
+      clickCountRef.current += 1;
 
-      timerRef.current = window.setTimeout(() => {
-        setState('secondary');
-      }, threshold);
+      if (clickCountRef.current === 1) {
+        // Start timer for single click
+        timerRef.current = window.setTimeout(() => {
+          if (clickCountRef.current === 1) {
+            onSingleClick();
+          }
+          clickCountRef.current = 0;
+          timerRef.current = null;
+        }, delay);
+      } else if (clickCountRef.current === 2) {
+        // Double click detected → cancel timer
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+        onDoubleClick();
+        clickCountRef.current = 0;
+      }
     },
-    [onActionSecondary, threshold]
+    [onSingleClick, onDoubleClick, delay]
   );
 
-  const endPress = useCallback(
-    (e: React.SyntheticEvent) => {
-      e.preventDefault();
+  return { handleClick };
+}
 
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
+export function useControlActive() {
+  const [active, setActive] = useState(false);
 
-      switch (state) {
-      case 'primary':
-        onActionPrimary();
-        break;
-      case 'secondary':
-        onActionSecondary();
-        break;
-      }
+  const activate = useCallback(() => {
+    setActive(true);
+  }, []);
 
-      setState('none');
-    },
-    [state, onActionPrimary, onActionSecondary]
-  );
-
-  const cancelPress = useCallback((e: React.SyntheticEvent) => {
-    e.preventDefault();
-
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-
-    setState('none');
+  const deactivate = useCallback(() => {
+    setActive(false);
   }, []);
 
   return {
-    state,
-    startPress,
-    endPress,
-    cancelPress,
+    active,
+    activate,
+    deactivate,
   };
 }

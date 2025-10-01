@@ -152,13 +152,35 @@ $secondary: #6c757d;
   opacity: 0.1;
   z-index: 9999;
   pointer-events: none;
+}
 
-  &.primary {
-    background-color: #bbf2bb;
+// Screen flash overlays for action feedback
+.mylife-screen-flash {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 10000;
+  pointer-events: none;
+  opacity: 0.3;
+  animation: flash 200ms ease-out;
+
+  &.mylife-screen-flash-primary {
+    background-color: var(--green);
   }
 
-  &.secondary {
-    background-color: #0384fc;
+  &.mylife-screen-flash-secondary {
+    background-color: var(--blue);
+  }
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
   }
 }
 
