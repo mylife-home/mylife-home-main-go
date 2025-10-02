@@ -5,54 +5,70 @@ export function useClickActions(
   onDoubleClick: () => void,
   delay: number = 300 // ms threshold between clicks
 ) {
+  const [active, setActive] = useState(false);
   const timerRef = useRef<number | null>(null);
   const clickCountRef = useRef(0);
 
-  const handleClick = useCallback(
-    (e: React.SyntheticEvent) => {
-      e.preventDefault();
-
-      clickCountRef.current += 1;
-
-      if (clickCountRef.current === 1) {
-        // Start timer for single click
-        timerRef.current = window.setTimeout(() => {
-          if (clickCountRef.current === 1) {
-            onSingleClick();
-          }
-          clickCountRef.current = 0;
-          timerRef.current = null;
-        }, delay);
-      } else if (clickCountRef.current === 2) {
-        // Double click detected → cancel timer
-        if (timerRef.current) {
-          clearTimeout(timerRef.current);
-          timerRef.current = null;
-        }
-        onDoubleClick();
-        clickCountRef.current = 0;
-      }
-    },
-    [onSingleClick, onDoubleClick, delay]
-  );
-
-  return { handleClick };
-}
-
-export function useControlActive() {
-  const [active, setActive] = useState(false);
-
-  const activate = useCallback(() => {
+  const start = useCallback((e: React.SyntheticEvent) => {
+    e.preventDefault();
     setActive(true);
   }, []);
 
-  const deactivate = useCallback(() => {
+  const stop = useCallback((e: React.SyntheticEvent) => {
+    e.preventDefault();
     setActive(false);
+
+    clickCountRef.current += 1;
+
+    switch (clickCountRef.current) {
+
+      case 1:
+      // First click - start timer for single click
+      timerRef.current = window.setTimeout(() => {
+        onSingleClick();
+        clickCountRef.current = 0;
+        timerRef.current = null;
+      }, delay);
+
+      break;
+
+    case 2:
+      // Second click - cancel timer and execute double click
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      onDoubleClick();
+
+      clickCountRef.current = 0;
+
+      break;
+    }
+  }, [onSingleClick, onDoubleClick, delay]);
+
+  const cancel = useCallback((e: React.SyntheticEvent) => {
+    e.preventDefault();
+    setActive(false);
+    
+    // Cancel everything
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (clickCountRef.current === 1) {
+      // If we had a single click pending, execute it now
+      onSingleClick();
+    }
+
+    clickCountRef.current = 0;
   }, []);
 
-  return {
+  return { 
     active,
-    activate,
-    deactivate,
+    start,
+    stop,
+    cancel,
   };
 }

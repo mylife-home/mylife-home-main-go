@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppState, AppThunkDispatch } from '../store/types';
 import { UIControl, makeGetUIControl } from '../store/selectors/control';
 import { actionPrimary, actionSecondary } from '../store/actions/actions';
-import { useClickActions, useControlActive } from '../behaviors/input-actions';
+import { useClickActions } from '../behaviors/input-actions';
 import { useFlashFeedback } from '../behaviors/flash-feedback';
 
 type ControlProps = {
@@ -16,7 +16,6 @@ const Control: FunctionComponent<ControlProps> = ({ windowId, controlId }) => {
   const { control, onActionPrimary, onActionSecondary } = useConnect(windowId, controlId);
   const { flash: flashPrimary, flashing: flashingPrimary } = useFlashFeedback();
   const { flash: flashSecondary, flashing: flashingSecondary } = useFlashFeedback();
-  const { active, activate, deactivate } = useControlActive();
 
   const handlePrimaryAction = useCallback(() => {
     if (control.hasPrimaryAction) {
@@ -32,7 +31,7 @@ const Control: FunctionComponent<ControlProps> = ({ windowId, controlId }) => {
     }
   }, [control, flashSecondary, onActionSecondary]);
   
-  const { handleClick } = useClickActions(handlePrimaryAction, handleSecondaryAction);
+  const { active, start, stop, cancel } = useClickActions(handlePrimaryAction, handleSecondaryAction);
 
   return (
     <>
@@ -47,13 +46,12 @@ const Control: FunctionComponent<ControlProps> = ({ windowId, controlId }) => {
       <div
         style={getStyleSizePosition(control)}
         className={clsx(control.hasPrimaryAction ? 'mylife-control-button' : 'mylife-control-inactive', { active }, ...control.style)}
-        onClick={handleClick}
-        onTouchStart={activate}
-        onTouchEnd={deactivate}
-        onTouchCancel={deactivate}
-        onMouseDown={activate}
-        onMouseUp={deactivate}
-        onMouseLeave={deactivate}
+        onTouchStart={start}
+        onTouchEnd={stop}
+        onTouchCancel={cancel}
+        onMouseDown={start}
+        onMouseUp={stop}
+        onMouseLeave={cancel}
       >
         {control.displayResource && <img src={`/resources/${control.displayResource}`} />}
         {control.text && <p>{control.text}</p>}
