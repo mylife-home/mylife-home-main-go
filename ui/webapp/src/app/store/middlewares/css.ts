@@ -26,5 +26,5 @@ function setCss(resource: string) {
     head.appendChild(link);
   }
 
-  link.href = `/resources/${resource}`;
+  link.href = `resources/${resource}`;
 }

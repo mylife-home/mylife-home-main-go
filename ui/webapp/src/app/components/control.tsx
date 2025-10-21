@@ -53,7 +53,7 @@ const Control: FunctionComponent<ControlProps> = ({ windowId, controlId }) => {
         onMouseUp={stop}
         onMouseLeave={cancel}
       >
-        {control.displayResource && <img src={`/resources/${control.displayResource}`} />}
+        {control.displayResource && <img src={`resources/${control.displayResource}`} />}
         {control.text && <p>{control.text}</p>}
         {control.hasSecondaryAction && (
           <div className="mylife-control-secondary-indicator" />

@@ -18,7 +18,7 @@ Use when we support async/await
 
 async function fetchResource(resource: string) {
   try {
-    const res = await fetch(`/resources/${resource}`);
+    const res = await fetch(`resources/${resource}`);
 
     if (res.status >= 400 && res.status < 600) {
       throw new Error(`HTTP error: ${res.status}: ${res.statusText}`);
@@ -31,7 +31,7 @@ async function fetchResource(resource: string) {
 }*/
 
 function fetchResource(resource: string) {
-  return fetch(`/resources/${resource}`)
+  return fetch(`resources/${resource}`)
     .then(handleErrors)
     .then(res => res.json())
     .catch(err => console.error(`Error fetching resource '${resource}'`, err));

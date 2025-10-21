@@ -44,5 +44,5 @@ function getBackground(window: Window) {
     return undefined;
   }
 
-  return `/resources/${window.backgroundResource}`;
+  return `resources/${window.backgroundResource}`;
 }
