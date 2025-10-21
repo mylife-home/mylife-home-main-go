@@ -19,8 +19,8 @@ document.addEventListener("visibilitychange", () => {
 });
 
 export const socketMiddleware: Middleware = (store) => (next) => {
-  // Note: do not use /ws if you want to use webpack.devServer.
-  const url = location.origin.replace(/^http/, 'ws') + '/websocket';
+  // Note: do not use 'ws' if you want to use webpack.devServer.
+  const url = makeWebSocketUrl('websocket');
   const socket = new ReconnectingWebSocket(url);
 
   socket.onopen = () => {
@@ -62,6 +62,17 @@ export const socketMiddleware: Middleware = (store) => (next) => {
     return next(action);
   };
 };
+
+// Build a WebSocket URL that follows browser relative resolution rules
+function makeWebSocketUrl(path: string) {
+  // Create a <a> element to let the browser resolve the relative path
+  const link = document.createElement('a');
+  link.href = path;
+  const absoluteUrl = link.href;
+
+  // Replace the protocol only (http → ws, https → wss)
+  return absoluteUrl.replace(/^http/, 'ws');
+}
 
 type Timer = ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>;
 type SocketMessageType = SocketMessage['type'];
