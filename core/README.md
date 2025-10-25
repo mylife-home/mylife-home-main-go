@@ -38,6 +38,7 @@ kubectl logs -n mylife-home pod-xxx -p
 
 ## Alpine - Raspberry PI
 
+- create release on github
 - publish using rpi-alpine-build
 - test on rpi:
 
