@@ -1,0 +1,29 @@
+# Maintainer: Vincent Trumpff <vincent.tr@gmail.com>
+
+pkgname=mylife-home-core
+
+# The version comes from mylife-home-core/pkg/version/value.go, passed in by
+# the Makefile, so the package never drifts from the binary it carries.
+pkgver="${PKGVER:?PKGVER is set by the Makefile, run 'make apk-build' from core/}"
+pkgrel="${PKGREL:-0}"
+
+pkgdesc="MyLife Home Core"
+url="https://github.com/mylife-home/mylife-home-main-go"
+arch="aarch64"
+license="GPL3"
+depends="ca-certificates"
+
+# The Makefile cross-compiles the binary before abuild runs, so there is
+# nothing to build, nothing to check, and no shared libraries to trace. The
+# binary is already stripped, and abuild runs on x86_64 where it could not
+# strip an aarch64 binary anyway.
+options="!check !strip !tracedeps"
+builddir="$srcdir"
+
+package() {
+	install -dm755 "$pkgdir"/var/log/mylife-home
+
+	install -Dm755 "$startdir"/mylife-home-core "$pkgdir"/usr/bin/mylife-home-core
+	install -Dm755 "$startdir"/mylife-home-core.initd "$pkgdir"/etc/init.d/mylife-home-core
+	install -Dm644 "$startdir"/config.yaml "$pkgdir"/etc/mylife-home/config.yaml
+}

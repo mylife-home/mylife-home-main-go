@@ -23,3 +23,5 @@
 bin/
 
 store.json
+core/alpine/mylife-home-core
+core/alpine/out/

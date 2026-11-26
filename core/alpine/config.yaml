@@ -1,0 +1,7 @@
+bus:
+  serverUrl: tcp://localhost:1883
+store:
+  type: lbu
+  path: /etc/mylife-home/store.json
+manager:
+  supportsBindings: true

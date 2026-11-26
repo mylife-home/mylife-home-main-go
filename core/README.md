@@ -38,18 +38,24 @@ kubectl logs -n mylife-home pod-xxx -p
 
 ## Alpine - Raspberry PI
 
-- create release on github
-- publish using rpi-alpine-build
-- test on rpi:
+### publish
+
+```shell
+# Note: version is fetched from `mylife-home-core/pkg/version/value.go`
+make apk-publish
+```
+
+Cross-compiles for aarch64, packages it with abuild signed by the shared
+builder key, and uploads it to the `rpi-alpine-packages` repository. Set
+`APK_PACKAGE_RELEASE` to republish the same version as a new package release.
+
+### install on the target
 
 ```bash
-apk add mylife-home-core-go
-
-vi /etc/mylife-home/config.yaml
-  your-should-override-this => localhost
-  supportsBindings => true
-
+apk update && apk add mylife-home-core
+rc-update add mylife-home-core
 rc-service mylife-home-core start
+lbu commit -d
 ```
 
 ## TODO
