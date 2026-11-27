@@ -54,16 +54,16 @@ func (api *rpcApi) Terminate() {
 	api.transport.Rpc().Unserve("store.save")
 }
 
-func (api *rpcApi) componentAdd(config *store.ComponentConfig) (struct{}, error) {
+func (api *rpcApi) componentAdd(config *store.ComponentConfig) (bus.NoOutput, error) {
 	err := api.cm.AddComponent(config.Id, config.Plugin, config.Config)
-	return struct{}{}, err
+	return bus.NoOutput{}, err
 }
 
 func (api *rpcApi) componentRemove(input struct {
 	Id string `json:"id"`
-}) (struct{}, error) {
+}) (bus.NoOutput, error) {
 	err := api.cm.RemoveComponent(input.Id)
-	return struct{}{}, err
+	return bus.NoOutput{}, err
 }
 
 func (api *rpcApi) componentList(input struct{}) ([]*store.ComponentConfig, error) {
@@ -71,14 +71,14 @@ func (api *rpcApi) componentList(input struct{}) ([]*store.ComponentConfig, erro
 	return list, nil
 }
 
-func (api *rpcApi) bindingAdd(config *store.BindingConfig) (struct{}, error) {
+func (api *rpcApi) bindingAdd(config *store.BindingConfig) (bus.NoOutput, error) {
 	err := api.cm.AddBinding(config)
-	return struct{}{}, err
+	return bus.NoOutput{}, err
 }
 
-func (api *rpcApi) bindingRemove(config *store.BindingConfig) (struct{}, error) {
+func (api *rpcApi) bindingRemove(config *store.BindingConfig) (bus.NoOutput, error) {
 	err := api.cm.RemoveBinding(config)
-	return struct{}{}, err
+	return bus.NoOutput{}, err
 }
 
 func (api *rpcApi) bindingList(input struct{}) ([]*store.BindingConfig, error) {
@@ -86,7 +86,7 @@ func (api *rpcApi) bindingList(input struct{}) ([]*store.BindingConfig, error) {
 	return list, nil
 }
 
-func (api *rpcApi) storeSave(input struct{}) (struct{}, error) {
+func (api *rpcApi) storeSave(input struct{}) (bus.NoOutput, error) {
 	err := api.cm.Save()
-	return struct{}{}, err
+	return bus.NoOutput{}, err
 }

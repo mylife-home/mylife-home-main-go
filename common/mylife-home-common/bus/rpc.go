@@ -190,7 +190,21 @@ func RpcCall[TInput any, TOutput any](rpc *Rpc, targetInstance string, address s
 		return nilOutput, fmt.Errorf("remote error: %s", respErr.Message)
 	}
 
+	// A successful call with nothing to return carries a null output.
+	if resp.Output == nil {
+		return nilOutput, nil
+	}
+
 	return *resp.Output, nil
+}
+
+// NoOutput is the reply of a service that has nothing to return. It marshals
+// to JSON null, which is what the envelope carries as the output of a
+// successful call with no value.
+type NoOutput struct{}
+
+func (NoOutput) MarshalJSON() ([]byte, error) {
+	return []byte("null"), nil
 }
 
 var _ RpcService = (*rpcServiceImpl[int, int])(nil)
@@ -273,9 +287,11 @@ type request[TInput any] struct {
 	ReplyTopic string `json:"replyTopic"`
 }
 
+// A successful reply carries output, null when the call has nothing to
+// return. A failed reply carries error alone.
 type response[TOutput any] struct {
-	Output *TOutput      `json:"output"`
-	Error  *reponseError `json:"error"`
+	Output *TOutput      `json:"output,omitempty"`
+	Error  *reponseError `json:"error,omitempty"`
 }
 
 type reponseError struct {

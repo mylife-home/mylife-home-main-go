@@ -28,7 +28,7 @@ func (api *rpcApi) Terminate() {
 	api.transport.Rpc().Unserve("definition.set")
 }
 
-func (api *rpcApi) definitionSet(definition *model.Definition) (struct{}, error) {
+func (api *rpcApi) definitionSet(definition *model.Definition) (bus.NoOutput, error) {
 	err := api.model.SetDefinition(definition)
-	return struct{}{}, err
+	return bus.NoOutput{}, err
 }
