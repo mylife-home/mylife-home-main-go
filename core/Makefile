@@ -10,7 +10,7 @@ APK_PACKAGE_RELEASE ?= 0
 APK_ARCH ?= aarch64
 APK_GOARCH ?= arm64
 APK_ALPINE_VERSION ?= 3.20
-APK_KEY_DIR ?= $(abspath $(CURDIR)/../../mylife-home-studio-data-dev/build-secrets/abuild)
+APK_KEY_DIR ?= $(abspath $(CURDIR)/../../lan-scripts/secrets/abuild)
 APK_KEY_NAME ?= mylife-home-builder.rsa
 APK_REPOSITORY ?= http://rpi-alpine-packages.apps.mti-team2.dyndns.org
 
